@@ -59,6 +59,7 @@ class Settings(BaseSettings):
 
     # ── Admin Web App ────────────────────────
     tma_admin_url: str = "https://your-domain.vercel.app"
+    tma_user_url: str = "https://your-user-tma.vercel.app"
     admin_web_port: int = 8080
 
 

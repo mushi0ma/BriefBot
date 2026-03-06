@@ -5,6 +5,8 @@ Provides a shared client for all repository modules.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from supabase import create_client, Client
 
 from app.config import get_settings
@@ -23,3 +25,34 @@ def get_supabase() -> Client:
         _client = create_client(settings.supabase_url, settings.supabase_key)
         logger.info("supabase_client_initialized", url=settings.supabase_url)
     return _client
+
+
+def upload_file(bucket: str, remote_path: str, file_path: str) -> str:
+    """
+    Upload a file to Supabase Storage and return its public URL.
+
+    Args:
+        bucket: Storage bucket name (e.g. 'briefs')
+        remote_path: Path inside the bucket (e.g. 'user_123/brief_2026.pdf')
+        file_path: Local file path to upload
+
+    Returns:
+        Public URL of the uploaded file
+    """
+    sb = get_supabase()
+    local = Path(file_path)
+
+    if not local.exists():
+        raise FileNotFoundError(f"File not found: {file_path}")
+
+    with open(file_path, "rb") as f:
+        sb.storage.from_(bucket).upload(
+            path=remote_path,
+            file=f,
+            file_options={"content-type": "application/pdf", "upsert": "true"},
+        )
+
+    public_url = sb.storage.from_(bucket).get_public_url(remote_path)
+    logger.info("file_uploaded", bucket=bucket, path=remote_path, url=public_url)
+    return public_url
+

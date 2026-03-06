@@ -7,9 +7,10 @@ from __future__ import annotations
 
 import math
 
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from app.config import get_settings
 from app.db.template_repo import get_all_templates
 
 
@@ -103,19 +104,25 @@ def history_item_keyboard(history_id: str) -> InlineKeyboardMarkup:
 # -- Feature 3: Main Menu ---------------------------------------------------
 
 def main_menu_keyboard() -> InlineKeyboardMarkup:
-    """Build the SPA-style main menu with 4 action buttons."""
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(text="🎙 Записать аудио", callback_data="menu:audio"),
-                InlineKeyboardButton(text="📝 Текст", callback_data="menu:text"),
-            ],
-            [
-                InlineKeyboardButton(text="⚙️ Шаблоны", callback_data="menu:templates"),
-                InlineKeyboardButton(text="📁 История", callback_data="menu:history"),
-            ],
-        ]
-    )
+    """Build the SPA-style main menu with action buttons + TMA link."""
+    settings = get_settings()
+    buttons = [
+        [
+            InlineKeyboardButton(text="🎙 Записать аудио", callback_data="menu:audio"),
+            InlineKeyboardButton(text="📝 Текст", callback_data="menu:text"),
+        ],
+        [
+            InlineKeyboardButton(text="⚙️ Шаблоны", callback_data="menu:templates"),
+            InlineKeyboardButton(text="📁 История", callback_data="menu:history"),
+        ],
+        [
+            InlineKeyboardButton(
+                text="💼 Личный кабинет",
+                web_app=WebAppInfo(url=settings.tma_user_url),
+            ),
+        ],
+    ]
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
 # -- Feature 6: Cancel Task -------------------------------------------------

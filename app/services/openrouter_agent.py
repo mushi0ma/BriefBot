@@ -7,6 +7,7 @@ Optimized for high-quality brief/document generation.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 from openai import AsyncOpenAI
@@ -27,6 +28,30 @@ def _is_rate_limit_error(exc: Exception) -> bool:
     """Check if the exception is a rate-limit error."""
     err_str = str(exc).lower()
     return "429" in err_str or "rate limit" in err_str or "rate_limit" in err_str
+
+
+def _extract_json(raw: str) -> str:
+    """
+    Extract JSON from model output that may contain extra text.
+    Handles:
+    - Markdown code fences (```json ... ``` or ``` ... ```)
+    - Explanatory text before/after JSON ("Вот ваш бриф: {...}")
+    """
+    text = raw.strip()
+
+    # 1. Try Markdown code fence extraction
+    fence_match = re.search(r"```(?:json)?\s*\n?(\{.*?\})\s*```", text, re.DOTALL)
+    if fence_match:
+        return fence_match.group(1).strip()
+
+    # 2. Find outermost { ... } — handles text before/after JSON
+    first_brace = text.find("{")
+    last_brace = text.rfind("}")
+    if first_brace != -1 and last_brace > first_brace:
+        return text[first_brace : last_brace + 1]
+
+    # 3. Return as-is and let json.loads() raise the error
+    return text
 
 
 class OpenRouterAgent:
@@ -159,9 +184,10 @@ class OpenRouterAgent:
         return self._parse_response(raw_json, text)
 
     def _parse_response(self, raw_json: str, fallback_text: str) -> BriefData:
-        """Parses JSON response into BriefData."""
+        """Parses JSON response into BriefData with robust extraction."""
         try:
-            data = json.loads(raw_json.strip())
+            cleaned = _extract_json(raw_json)
+            data = json.loads(cleaned)
             return BriefData(
                 service_type=data.get("service_type", ""),
                 deadline=data.get("deadline", ""),

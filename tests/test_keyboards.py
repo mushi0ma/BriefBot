@@ -74,18 +74,25 @@ class TestHistoryItemKeyboard:
 class TestMainMenuKeyboard:
     """Test main menu keyboard structure."""
 
-    def test_has_four_buttons(self):
+    def test_has_five_buttons(self):
         kb = main_menu_keyboard()
         buttons = [btn for row in kb.inline_keyboard for btn in row]
-        assert len(buttons) == 4
+        assert len(buttons) == 5
 
     def test_callback_data_values(self):
         kb = main_menu_keyboard()
-        callbacks = [btn.callback_data for row in kb.inline_keyboard for btn in row]
+        callbacks = [btn.callback_data for row in kb.inline_keyboard for btn in row if btn.callback_data]
         assert "menu:audio" in callbacks
         assert "menu:text" in callbacks
         assert "menu:templates" in callbacks
         assert "menu:history" in callbacks
+
+    def test_tma_button_present(self):
+        kb = main_menu_keyboard()
+        buttons = [btn for row in kb.inline_keyboard for btn in row]
+        tma = [b for b in buttons if b.web_app is not None]
+        assert len(tma) == 1
+        assert "Личный кабинет" in tma[0].text
 
 
 class TestCancelTaskKeyboard:
