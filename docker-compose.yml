@@ -1,0 +1,76 @@
+version: "3.9"
+
+services:
+  # ── Main + Admin Bots ────────────────────────────────────────────────
+  bot:
+    build: .
+    container_name: briefbot-bot
+    command: sh -c "python scripts/migrate.py && python run_bot.py"
+    env_file: .env
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - briefbot-tmp:/tmp/briefbot
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ── Celery Worker ────────────────────────────────────────────────────
+  worker:
+    build: .
+    container_name: briefbot-worker
+    command: celery -A app.worker.celery_app worker --loglevel=info --concurrency=2 -Q briefbot
+    env_file: .env
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - briefbot-tmp:/tmp/briefbot
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ── Celery Beat (Scheduler) ─────────────────────────────────────────
+  beat:
+    build: .
+    container_name: briefbot-beat
+    command: celery -A app.worker.celery_app beat --loglevel=info
+    env_file: .env
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+  # ── Redis ────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: briefbot-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+
+volumes:
+  briefbot-tmp:
+  redis-data:

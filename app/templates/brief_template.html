@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        @page {
+            size: A4;
+            margin: 20mm 15mm 25mm 15mm;
+            @bottom-center {
+                content: "BriefBot AI Assistant | Страница " counter(page) " из " counter(pages);
+                font-size: 8pt;
+                color: #999;
+            }
+        }
+
+        body {
+            font-family: 'DejaVu Sans', 'Arial', sans-serif;
+            font-size: {{ style.font_size_body }}pt;
+            color: #2c3e50;
+            line-height: 1.5;
+            margin: 0;
+            padding: 0;
+        }
+
+        .header {
+            background-color: rgb({{ style.header_bg[0] }}, {{ style.header_bg[1] }}, {{ style.header_bg[2] }});
+            color: white;
+            padding: 20px 25px;
+            margin: -20mm -15mm 20px -15mm;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: {{ style.font_size_title }}pt;
+            margin: 0 0 5px 0;
+            letter-spacing: 2px;
+        }
+
+        .header .logo {
+            max-height: 50px;
+            margin-bottom: 10px;
+        }
+
+        .header .template-name {
+            font-size: 10pt;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            opacity: 0.9;
+        }
+
+        .header .date {
+            font-size: 8pt;
+            opacity: 0.7;
+            margin-top: 8px;
+        }
+
+        .summary {
+            font-size: 12pt;
+            font-weight: bold;
+            color: rgb({{ style.accent_color[0] }}, {{ style.accent_color[1] }}, {{ style.accent_color[2] }});
+            margin-bottom: 20px;
+            padding: 10px 0;
+            border-bottom: 2px solid rgb({{ style.accent_color[0] }}, {{ style.accent_color[1] }}, {{ style.accent_color[2] }});
+        }
+
+        .section {
+            margin-bottom: 15px;
+            page-break-inside: avoid;
+        }
+
+        .section-title {
+            background-color: rgb({{ style.accent_color[0] }}, {{ style.accent_color[1] }}, {{ style.accent_color[2] }});
+            color: white;
+            padding: 6px 12px;
+            font-size: {{ style.font_size_section }}pt;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+
+        .section-body {
+            padding: 5px 12px;
+            font-size: {{ style.font_size_body }}pt;
+        }
+
+        .section-body.empty {
+            color: #b4b4b4;
+            font-style: italic;
+        }
+
+        /* Markdown rendered elements */
+        .section-body ul, .section-body ol {
+            margin: 4px 0;
+            padding-left: 24px;
+        }
+
+        .section-body li {
+            margin-bottom: 3px;
+        }
+
+        .section-body p {
+            margin: 4px 0;
+        }
+
+        .section-body strong {
+            font-weight: bold;
+        }
+
+        .section-body em {
+            font-style: italic;
+        }
+
+        .original-text {
+            margin-top: 30px;
+            padding-top: 15px;
+            border-top: 1px solid #ccc;
+        }
+
+        .original-text-label {
+            font-size: 8pt;
+            color: #999;
+            font-style: italic;
+        }
+
+        .original-text-content {
+            font-size: 8pt;
+            color: #999;
+            font-style: italic;
+            line-height: 1.4;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        {% if logo_url %}
+        <img class="logo" src="{{ logo_url }}" alt="Logo">
+        {% endif %}
+        <h1>PROJECT BRIEF</h1>
+        <div class="template-name">{{ template_name }}</div>
+        <div class="date">Сгенерировано: {{ generated_date }}</div>
+    </div>
+
+    {% if summary %}
+    <div class="summary">{{ summary }}</div>
+    {% endif %}
+
+    {% for section in sections %}
+    <div class="section">
+        <div class="section-title">{{ section.title }}</div>
+        <div class="section-body{% if not section.content %} empty{% endif %}">
+            {% if section.content %}
+                {{ section.content | safe }}
+            {% else %}
+                Не указано
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+
+    {% if original_text and original_text != "Processed via Gemini 2.0 Flash" %}
+    <div class="original-text">
+        <div class="original-text-label">Исходный текст:</div>
+        <div class="original-text-content">{{ original_text[:500] }}{% if original_text|length > 500 %}...{% endif %}</div>
+    </div>
+    {% endif %}
+</body>
+</html>
