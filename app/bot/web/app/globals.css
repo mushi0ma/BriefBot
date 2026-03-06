@@ -2,41 +2,143 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ── Telegram Theme Variables ─────────────────────────────────── */
+/* ── Telegram Native Theme ────────────────────────────────────── */
 :root {
-  --tg-theme-bg-color: #1c1c1e;
-  --tg-theme-secondary-bg-color: #2c2c2e;
-  --tg-theme-text-color: #ffffff;
-  --tg-theme-hint-color: #98989e;
-  --tg-theme-link-color: #2481cc;
-  --tg-theme-button-color: #2481cc;
-  --tg-theme-button-text-color: #ffffff;
+  --tg-bg: #1c1c1e;
+  --tg-secondary-bg: #2c2c2e;
+  --tg-section-bg: #1c1c1e;
+  --tg-separator: rgba(84, 84, 88, 0.35);
+  --tg-text: #ffffff;
+  --tg-text-secondary: #98989e;
+  --tg-accent: #3e88f7;
+  --tg-destructive: #ff453a;
+  --tg-success: #30d158;
+  --tg-warning: #ffd60a;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
-  background-color: var(--tg-theme-bg-color, #1c1c1e);
-  color: var(--tg-theme-text-color, #fff);
+  background-color: var(--tg-theme-secondary-bg-color, #000000);
+  color: var(--tg-theme-text-color, var(--tg-text));
   user-select: none;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-    "Helvetica Neue", Arial, sans-serif;
+  font-family: -apple-system, "SF Pro Text", BlinkMacSystemFont, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   min-height: 100vh;
+  font-size: 16px;
+  line-height: 1.4;
 }
 
-/* ── Glassmorphism Card ──────────────────────────────────────── */
-.glass-card {
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
+/* ── Section Card (BotFather style) ───────────────────────────── */
+.tg-section {
+  background-color: var(--tg-theme-bg-color, var(--tg-section-bg));
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+/* ── Section Header ──────────────────────────────────────────── */
+.tg-section-header {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--tg-theme-hint-color, var(--tg-text-secondary));
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  padding: 8px 16px 6px;
+}
+
+/* ── List Item (native iOS/Telegram style) ───────────────────── */
+.tg-list-item {
+  display: flex;
+  align-items: center;
+  padding: 11px 16px;
+  gap: 12px;
+  min-height: 44px;
+  transition: background-color 0.15s ease;
+}
+
+.tg-list-item:active {
+  background-color: rgba(255, 255, 255, 0.04);
+}
+
+.tg-list-item+.tg-list-item {
+  border-top: 0.5px solid var(--tg-separator);
+  margin-left: 52px;
+  padding-left: 0;
+}
+
+.tg-list-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.tg-chevron {
+  color: rgba(60, 60, 67, 0.3);
+  font-size: 13px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* ── Bottom Tab Bar ──────────────────────────────────────────── */
+.tg-tab-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background-color: var(--tg-theme-bg-color, var(--tg-section-bg));
+  border-top: 0.5px solid var(--tg-separator);
+  display: flex;
+  justify-content: space-around;
+  padding: 6px 0 env(safe-area-inset-bottom, 16px);
+  z-index: 50;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.tg-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  font-size: 10px;
+  color: var(--tg-theme-hint-color, var(--tg-text-secondary));
+  padding: 4px 12px;
+  transition: color 0.2s;
+  cursor: pointer;
+  border: none;
+  background: none;
+}
+
+.tg-tab.active {
+  color: var(--tg-theme-button-color, var(--tg-accent));
+}
+
+.tg-tab-icon {
+  font-size: 22px;
+  line-height: 1;
+}
+
+/* ── Badge ───────────────────────────────────────────────────── */
+.tg-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 6px;
 }
 
 /* ── Animations ──────────────────────────────────────────────── */
-@keyframes fadeInUp {
+@keyframes fadeIn {
   from {
     opacity: 0;
-    transform: translateY(12px);
+    transform: translateY(6px);
   }
 
   to {
@@ -45,10 +147,11 @@ body {
   }
 }
 
-.animate-fade-in-up {
-  animation: fadeInUp 0.4s ease-out forwards;
+.animate-in {
+  animation: fadeIn 0.25s ease-out forwards;
 }
 
+/* Skeleton */
 @keyframes shimmer {
   0% {
     background-position: -200% 0;
@@ -60,8 +163,8 @@ body {
 }
 
 .skeleton {
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0.04) 25%, rgba(255, 255, 255, 0.08) 50%, rgba(255, 255, 255, 0.04) 75%);
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.04) 25%, rgba(255, 255, 255, 0.07) 50%, rgba(255, 255, 255, 0.04) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
-  border-radius: 8px;
+  border-radius: 6px;
 }

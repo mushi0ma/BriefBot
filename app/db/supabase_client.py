@@ -46,10 +46,21 @@ def upload_file(bucket: str, remote_path: str, file_path: str) -> str:
         raise FileNotFoundError(f"File not found: {file_path}")
 
     with open(file_path, "rb") as f:
+        # Auto-detect content type from extension
+        ext = local.suffix.lower()
+        content_types = {
+            ".pdf": "application/pdf",
+            ".jpg": "image/jpeg",
+            ".jpeg": "image/jpeg",
+            ".png": "image/png",
+            ".webp": "image/webp",
+        }
+        content_type = content_types.get(ext, "application/octet-stream")
+
         sb.storage.from_(bucket).upload(
             path=remote_path,
             file=f,
-            file_options={"content-type": "application/pdf", "upsert": "true"},
+            file_options={"content-type": content_type, "upsert": "true"},
         )
 
     public_url = sb.storage.from_(bucket).get_public_url(remote_path)

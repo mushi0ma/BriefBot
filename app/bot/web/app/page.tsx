@@ -23,82 +23,84 @@ interface UserSettings {
 type Tab = "history" | "settings" | "templates";
 
 const PRESET_COLORS = [
-  "#E74C3C", "#2980B9", "#27AE60", "#F39C12",
-  "#8E44AD", "#2C3E50", "#E67E22", "#1ABC9C",
+  "#3e88f7", "#30d158", "#ff9f0a", "#ff453a",
+  "#bf5af2", "#64d2ff", "#ff375f", "#ac8e68",
 ];
 
 const TEMPLATES = [
-  { slug: "default", name: "🎯 Универсальный", desc: "Подходит для любых проектов" },
-  { slug: "design", name: "🎨 Дизайн", desc: "Визуальные проекты и брендинг" },
-  { slug: "development", name: "💻 Разработка", desc: "Сайты и приложения" },
-  { slug: "marketing", name: "📊 Маркетинг", desc: "Продвижение и реклама" },
+  { slug: "default", icon: "🎯", name: "Универсальный", desc: "Подходит для любых проектов" },
+  { slug: "design", icon: "🎨", name: "Дизайн", desc: "Визуальные проекты и брендинг" },
+  { slug: "development", icon: "💻", name: "Разработка", desc: "Сайты и приложения" },
+  { slug: "marketing", icon: "📊", name: "Маркетинг", desc: "Продвижение и реклама" },
 ];
 
-/* ── Helper ────────────────────────────────────────────────────── */
+/* ── Helpers ───────────────────────────────────────────────────── */
 function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("ru-RU", {
-    day: "numeric", month: "short", year: "numeric",
+  const d = new Date(iso);
+  return d.toLocaleDateString("ru-RU", {
+    day: "numeric", month: "short",
+  }) + ", " + d.toLocaleTimeString("ru-RU", {
     hour: "2-digit", minute: "2-digit",
   });
 }
 
-function stateLabel(state: string): { text: string; color: string } {
+function stateInfo(state: string) {
   switch (state) {
-    case "done": return { text: "✅ Готов", color: "text-green-400" };
-    case "failed": return { text: "❌ Ошибка", color: "text-red-400" };
-    default: return { text: "⏳ Обработка", color: "text-yellow-400" };
+    case "done": return { label: "Готов", color: "bg-[#30d158]/15 text-[#30d158]" };
+    case "failed": return { label: "Ошибка", color: "bg-[#ff453a]/15 text-[#ff453a]" };
+    default: return { label: "Обработка...", color: "bg-[#ff9f0a]/15 text-[#ff9f0a]" };
   }
 }
 
-/* ── Skeleton ──────────────────────────────────────────────────── */
-function SkeletonCard() {
-  return (
-    <div className="glass-card p-4 space-y-3">
-      <div className="skeleton h-4 w-3/4" />
-      <div className="skeleton h-3 w-1/2" />
-      <div className="skeleton h-3 w-1/3" />
-    </div>
-  );
+/* ── Tab Icon ─────────────────────────────────────────────────── */
+function TabIcon({ tab, active }: { tab: Tab; active: boolean }) {
+  const color = active ? "var(--tg-theme-button-color, #3e88f7)" : "currentColor";
+  if (tab === "history") return <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8"><rect x="4" y="4" width="16" height="18" rx="2" /><line x1="8" y1="9" x2="16" y2="9" /><line x1="8" y1="13" x2="14" y2="13" /><line x1="8" y1="17" x2="12" y2="17" /></svg>;
+  if (tab === "settings") return <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8"><circle cx="12" cy="12" r="3" /><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" /></svg>;
+  return <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8"><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></svg>;
 }
 
-/* ── Brief Card ────────────────────────────────────────────────── */
-function BriefCard({ brief }: { brief: Brief }) {
-  const status = stateLabel(brief.processing_state);
+/* ── Brief Row ────────────────────────────────────────────────── */
+function BriefRow({ brief, isLast }: { brief: Brief; isLast: boolean }) {
+  const status = stateInfo(brief.processing_state);
   const summary = brief.brief_data?.summary;
+  const hasPdf = brief.pdf_url && brief.pdf_url.startsWith("http");
 
   return (
-    <div className="glass-card p-4 animate-fade-in-up space-y-2">
-      <div className="flex justify-between items-start">
-        <div>
-          <span className="text-xs uppercase tracking-wide text-tg-hint">
-            {brief.template_slug}
-          </span>
-          <p className={`text-sm font-medium ${status.color}`}>{status.text}</p>
+    <div className={`tg-list-item flex-col !items-stretch !gap-0 ${!isLast ? "border-b border-[var(--tg-separator)]" : ""}`}>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="tg-list-icon bg-[var(--tg-theme-button-color,#3e88f7)]/10 text-xs">
+            📋
+          </div>
+          <div className="min-w-0">
+            <p className="text-[15px] font-normal truncate">
+              {brief.template_slug.charAt(0).toUpperCase() + brief.template_slug.slice(1)}
+            </p>
+            <p className="text-[13px] text-[var(--tg-theme-hint-color,#98989e)]">
+              {formatDate(brief.created_at)}
+            </p>
+          </div>
         </div>
-        <span className="text-xs text-tg-hint">{formatDate(brief.created_at)}</span>
+        <span className={`tg-badge ${status.color}`}>{status.label}</span>
       </div>
 
       {summary && (
-        <p className="text-sm text-tg-text/80 line-clamp-2">{summary}</p>
+        <p className="text-[13px] text-[var(--tg-theme-hint-color,#98989e)] mt-1.5 ml-[42px] line-clamp-2">
+          {summary}
+        </p>
       )}
 
-      <div className="flex gap-2 pt-1">
-        {brief.pdf_url && brief.pdf_url.startsWith("http") && (
-          <a
-            href={brief.pdf_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs px-3 py-1.5 rounded-full bg-tg-button text-tg-button-text font-medium"
-          >
-            📄 Скачать PDF
-          </a>
-        )}
-        {brief.processing_time_ms && (
-          <span className="text-xs text-tg-hint self-center">
-            {(brief.processing_time_ms / 1000).toFixed(1)}с
-          </span>
-        )}
-      </div>
+      {hasPdf && (
+        <a
+          href={brief.pdf_url!}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1.5 mt-2 ml-[42px] text-[13px] font-medium text-[var(--tg-theme-button-color,#3e88f7)]"
+        >
+          <span>📄</span> Скачать PDF
+        </a>
+      )}
     </div>
   );
 }
@@ -116,36 +118,25 @@ export default function Dashboard() {
   const [logoInput, setLogoInput] = useState("");
 
   const apiFetch = useCallback(
-    async (path: string, opts: RequestInit = {}) => {
-      return fetch(path, {
+    async (path: string, opts: RequestInit = {}) =>
+      fetch(path, {
         ...opts,
-        headers: {
-          Authorization: initData,
-          "Content-Type": "application/json",
-          ...opts.headers,
-        },
-      });
-    },
+        headers: { Authorization: initData, "Content-Type": "application/json", ...opts.headers },
+      }),
     [initData]
   );
 
-  // Load data
   useEffect(() => {
     if (!isReady) return;
     setLoading(true);
-
     Promise.all([
       apiFetch("/api/history").then((r) => r.json()),
       apiFetch("/api/settings").then((r) => r.json()),
     ])
-      .then(([historyData, settingsData]) => {
-        setBriefs(historyData.briefs ?? []);
-        setSettings({
-          brand_color: settingsData.brand_color ?? null,
-          logo_url: settingsData.logo_url ?? null,
-          default_template: settingsData.default_template ?? null,
-        });
-        setLogoInput(settingsData.logo_url ?? "");
+      .then(([h, s]) => {
+        setBriefs(h.briefs ?? []);
+        setSettings({ brand_color: s.brand_color ?? null, logo_url: s.logo_url ?? null, default_template: s.default_template ?? null });
+        setLogoInput(s.logo_url ?? "");
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -154,155 +145,181 @@ export default function Dashboard() {
   const updateSetting = async (field: string, value: string) => {
     setSaving(true);
     try {
-      const res = await apiFetch("/api/settings", {
-        method: "PATCH",
-        body: JSON.stringify({ [field]: value }),
-      });
-      if (res.ok) {
-        setSettings((prev) => ({ ...prev, [field]: value }));
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setSaving(false);
-    }
+      const res = await apiFetch("/api/settings", { method: "PATCH", body: JSON.stringify({ [field]: value }) });
+      if (res.ok) setSettings((p) => ({ ...p, [field]: value }));
+    } catch (e) { console.error(e); }
+    finally { setSaving(false); }
   };
 
   const tabs: { key: Tab; label: string }[] = [
-    { key: "history", label: "📋 История" },
-    { key: "settings", label: "⚙️ Настройки" },
-    { key: "templates", label: "📁 Шаблоны" },
+    { key: "history", label: "История" },
+    { key: "settings", label: "Настройки" },
+    { key: "templates", label: "Шаблоны" },
   ];
 
-  return (
-    <main className="min-h-screen p-4 pb-20 max-w-lg mx-auto">
-      {/* Header */}
-      <h1 className="text-xl font-bold text-center mb-4 animate-fade-in-up">
-        💼 Личный кабинет
-      </h1>
+  if (!isReady) return null;
 
-      {/* Tab Bar */}
-      <div className="flex gap-1 p-1 rounded-xl bg-white/5 mb-4">
-        {tabs.map((t) => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            className={`flex-1 py-2 text-sm rounded-lg font-medium transition-all ${tab === t.key
-                ? "bg-tg-button text-tg-button-text shadow-lg"
-                : "text-tg-hint hover:text-tg-text"
-              }`}
-          >
-            {t.label}
-          </button>
-        ))}
+  return (
+    <main className="min-h-screen pb-24 max-w-lg mx-auto">
+      {/* ── Header ──────────────────────────────────────────────── */}
+      <div className="px-4 pt-4 pb-3">
+        <h1 className="text-[20px] font-semibold">Личный кабинет</h1>
       </div>
 
-      {/* Tab Content */}
+      {/* ── Content ─────────────────────────────────────────────── */}
       {loading ? (
-        <div className="space-y-3">
-          <SkeletonCard />
-          <SkeletonCard />
-          <SkeletonCard />
+        <div className="px-4 space-y-3 animate-in">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="tg-section p-4 space-y-2">
+              <div className="skeleton h-4 w-3/4" />
+              <div className="skeleton h-3 w-1/2" />
+            </div>
+          ))}
         </div>
       ) : (
-        <>
-          {/* ── History Tab ──────────────────────────────────────── */}
+        <div className="animate-in">
+          {/* ── HISTORY TAB ──────────────────────────────────────── */}
           {tab === "history" && (
-            <div className="space-y-3">
+            <>
               {briefs.length === 0 ? (
-                <div className="glass-card p-8 text-center">
-                  <p className="text-3xl mb-2">📭</p>
-                  <p className="text-tg-hint text-sm">
-                    Пока нет брифов. Отправьте аудио или текст боту!
-                  </p>
+                <div className="px-4">
+                  <div className="tg-section p-6 text-center">
+                    <p className="text-[40px] mb-2">📭</p>
+                    <p className="text-[15px] text-[var(--tg-theme-hint-color,#98989e)]">
+                      Пока нет брифов
+                    </p>
+                    <p className="text-[13px] text-[var(--tg-theme-hint-color,#98989e)] mt-1">
+                      Отправьте аудио или текст боту
+                    </p>
+                  </div>
                 </div>
               ) : (
-                briefs.map((b) => <BriefCard key={b.id} brief={b} />)
+                <>
+                  <p className="tg-section-header">
+                    Последние брифы
+                  </p>
+                  <div className="mx-4 tg-section">
+                    {briefs.map((b, i) => (
+                      <BriefRow key={b.id} brief={b} isLast={i === briefs.length - 1} />
+                    ))}
+                  </div>
+                </>
               )}
-            </div>
+            </>
           )}
 
-          {/* ── Settings Tab ─────────────────────────────────────── */}
+          {/* ── SETTINGS TAB ─────────────────────────────────────── */}
           {tab === "settings" && (
-            <div className="space-y-4">
-              {/* Color Picker */}
-              <div className="glass-card p-4 animate-fade-in-up">
-                <h2 className="text-sm font-semibold mb-3">🎨 Цвет акцента PDF</h2>
-                <div className="flex flex-wrap gap-2">
+            <>
+              {/* Color Section */}
+              <p className="tg-section-header">Цвет акцента PDF</p>
+              <div className="mx-4 tg-section p-4">
+                <div className="flex flex-wrap gap-3 justify-center">
                   {PRESET_COLORS.map((c) => (
                     <button
                       key={c}
                       onClick={() => updateSetting("brand_color", c)}
                       disabled={saving}
-                      className={`w-10 h-10 rounded-full border-2 transition-all ${settings.brand_color === c
-                          ? "border-white scale-110 shadow-lg"
-                          : "border-transparent opacity-70 hover:opacity-100"
-                        }`}
+                      className="relative w-11 h-11 rounded-full transition-transform"
                       style={{ backgroundColor: c }}
-                    />
+                    >
+                      {settings.brand_color === c && (
+                        <span className="absolute inset-0 flex items-center justify-center text-white text-lg font-bold">✓</span>
+                      )}
+                    </button>
                   ))}
                 </div>
                 {settings.brand_color && (
-                  <p className="text-xs text-tg-hint mt-2">
+                  <p className="text-[13px] text-[var(--tg-theme-hint-color,#98989e)] text-center mt-3">
                     Выбран: <span className="font-mono">{settings.brand_color}</span>
                   </p>
                 )}
               </div>
 
-              {/* Logo URL */}
-              <div className="glass-card p-4 animate-fade-in-up">
-                <h2 className="text-sm font-semibold mb-3">🖼 Логотип</h2>
+              {/* Logo Section */}
+              <p className="tg-section-header mt-6">Логотип</p>
+              <div className="mx-4 tg-section p-4">
                 <div className="flex gap-2">
                   <input
                     type="url"
                     value={logoInput}
                     onChange={(e) => setLogoInput(e.target.value)}
                     placeholder="https://example.com/logo.png"
-                    className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-tg-text placeholder:text-tg-hint/50 outline-none focus:border-tg-button"
+                    className="flex-1 bg-[var(--tg-theme-secondary-bg-color,#2c2c2e)] rounded-lg px-3 py-2.5 text-[15px] text-[var(--tg-theme-text-color,#fff)] placeholder:text-[var(--tg-theme-hint-color,#98989e)]/40 outline-none border border-[var(--tg-separator)] focus:border-[var(--tg-theme-button-color,#3e88f7)]"
                   />
                   <button
                     onClick={() => updateSetting("logo_url", logoInput)}
                     disabled={saving || !logoInput}
-                    className="px-4 py-2 rounded-lg bg-tg-button text-tg-button-text text-sm font-medium disabled:opacity-40"
+                    className="px-4 py-2.5 rounded-lg bg-[var(--tg-theme-button-color,#3e88f7)] text-[var(--tg-theme-button-text-color,#fff)] text-[15px] font-medium disabled:opacity-30"
                   >
-                    {saving ? "..." : "Сохранить"}
+                    {saving ? "..." : "OK"}
                   </button>
                 </div>
                 {settings.logo_url && (
-                  <p className="text-xs text-tg-hint mt-2 truncate">
-                    Текущий: {settings.logo_url}
+                  <p className="text-[13px] text-[var(--tg-theme-hint-color,#98989e)] mt-2 truncate">
+                    {settings.logo_url}
                   </p>
                 )}
               </div>
-            </div>
+              <p className="text-[12px] text-[var(--tg-theme-hint-color,#98989e)] px-8 mt-1.5">
+                Логотип будет отображаться в ваших PDF-брифах. Загрузите через бота или укажите URL.
+              </p>
+            </>
           )}
 
-          {/* ── Templates Tab ────────────────────────────────────── */}
+          {/* ── TEMPLATES TAB ────────────────────────────────────── */}
           {tab === "templates" && (
-            <div className="space-y-3">
-              {TEMPLATES.map((t) => (
-                <button
-                  key={t.slug}
-                  onClick={() => updateSetting("default_template", t.slug)}
-                  disabled={saving}
-                  className={`glass-card p-4 w-full text-left animate-fade-in-up transition-all ${settings.default_template === t.slug
-                      ? "border-tg-button border-2"
-                      : "hover:bg-white/10"
-                    }`}
-                >
-                  <p className="font-semibold text-sm">{t.name}</p>
-                  <p className="text-xs text-tg-hint mt-1">{t.desc}</p>
-                  {settings.default_template === t.slug && (
-                    <span className="text-xs text-tg-button mt-1 inline-block">
-                      ✓ Выбран по умолчанию
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
+            <>
+              <p className="tg-section-header">Шаблон по умолчанию</p>
+              <div className="mx-4 tg-section">
+                {TEMPLATES.map((t, i) => {
+                  const selected = settings.default_template === t.slug;
+                  return (
+                    <button
+                      key={t.slug}
+                      onClick={() => updateSetting("default_template", t.slug)}
+                      disabled={saving}
+                      className={`tg-list-item w-full text-left ${i > 0 ? "border-t border-[var(--tg-separator)] !ml-0 !pl-4" : ""}`}
+                    >
+                      <div className="tg-list-icon bg-[var(--tg-theme-button-color,#3e88f7)]/10 text-base">
+                        {t.icon}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[15px]">{t.name}</p>
+                        <p className="text-[13px] text-[var(--tg-theme-hint-color,#98989e)]">{t.desc}</p>
+                      </div>
+                      {selected ? (
+                        <span className="text-[var(--tg-theme-button-color,#3e88f7)] text-lg">✓</span>
+                      ) : (
+                        <span className="tg-chevron">›</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[12px] text-[var(--tg-theme-hint-color,#98989e)] px-8 mt-1.5">
+                Выбранный шаблон будет использоваться по умолчанию при генерации новых брифов.
+              </p>
+            </>
           )}
-        </>
+        </div>
       )}
+
+      {/* ── Bottom Tab Bar ──────────────────────────────────────── */}
+      <nav className="tg-tab-bar">
+        {tabs.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={`tg-tab ${tab === t.key ? "active" : ""}`}
+          >
+            <span className="tg-tab-icon">
+              <TabIcon tab={t.key} active={tab === t.key} />
+            </span>
+            <span>{t.label}</span>
+          </button>
+        ))}
+      </nav>
     </main>
   );
 }

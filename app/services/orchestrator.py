@@ -204,6 +204,16 @@ class OrchestratorAgent:
             self._update_history(history_id, ProcessingState.GENERATING_PDF)
             pdf_path = generate_pdf(brief_data, template)
 
+            # 2b. Upload PDF to Supabase Storage
+            pdf_url = pdf_path  # fallback to local path
+            try:
+                remote_name = Path(pdf_path).name
+                remote_path = f"{telegram_id}/{remote_name}"
+                pdf_url = upload_file("briefs", remote_path, pdf_path)
+                logger.info("pdf_uploaded", user_id=telegram_id, url=pdf_url)
+            except Exception as upload_err:
+                logger.warning("pdf_upload_failed", error=str(upload_err))
+
             # 3. Final Logs & Stats
             elapsed_ms = int((time.monotonic() - start_time) * 1000)
 
@@ -212,7 +222,7 @@ class OrchestratorAgent:
                 processing_state=ProcessingState.DONE.value,
                 original_text=text,
                 brief_data=brief_data.model_dump(),
-                pdf_url=pdf_path,
+                pdf_url=pdf_url,
                 processing_time_ms=elapsed_ms,
             )
             UserRepo.increment_briefs(telegram_id)
@@ -302,6 +312,16 @@ class OrchestratorAgent:
                 logo_url=logo_url,
             )
 
+            # 1b. Upload PDF to Supabase Storage
+            pdf_url = pdf_path  # fallback to local path
+            try:
+                remote_name = Path(pdf_path).name
+                remote_path = f"{telegram_id}/{remote_name}"
+                pdf_url = upload_file("briefs", remote_path, pdf_path)
+                logger.info("pdf_uploaded", user_id=telegram_id, url=pdf_url)
+            except Exception as upload_err:
+                logger.warning("pdf_upload_failed", error=str(upload_err))
+
             # 2. Final Logs & Stats
             elapsed_ms = int((time.monotonic() - start_time) * 1000)
 
@@ -310,7 +330,7 @@ class OrchestratorAgent:
                 processing_state=ProcessingState.DONE.value,
                 original_text=original_text,
                 brief_data=brief_data.model_dump(),
-                pdf_url=pdf_path,
+                pdf_url=pdf_url,
                 processing_time_ms=elapsed_ms,
             )
             UserRepo.increment_briefs(telegram_id)

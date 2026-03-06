@@ -506,16 +506,31 @@ async def handle_missing_info_text(message: Message, state: FSMContext, bot: Bot
 # ── Text: Logo Upload (Feature 9) ──────────────────────────────────────────
 @router.message(F.photo, BriefState.uploading_logo)
 async def handle_logo_upload(message: Message, state: FSMContext, bot: Bot) -> None:
-    """Handle logo image upload for branding."""
+    """Handle logo image upload for branding — uploads to Supabase Storage."""
     user_id = message.from_user.id if message.from_user else 0
 
     # Get highest resolution photo
     photo = message.photo[-1]
     file = await bot.get_file(photo.file_id)
 
-    # Save logo reference (file_id for later download)
     try:
-        UserRepo.update_branding(user_id, logo_url=f"tg://file/{file.file_id}")
+        # 1. Download from Telegram to local temp file
+        settings = get_settings()
+        download_dir = settings.temp_dir / "logos"
+        download_dir.mkdir(parents=True, exist_ok=True)
+        local_path = str(download_dir / f"logo_{user_id}.jpg")
+        await bot.download_file(file.file_path, local_path)
+
+        # 2. Upload to Supabase Storage
+        from app.db.supabase_client import upload_file as sb_upload
+        remote_path = f"{user_id}/logo.jpg"
+        public_url = sb_upload("brand_assets", remote_path, local_path)
+
+        # 3. Cleanup local file
+        Path(local_path).unlink(missing_ok=True)
+
+        # 4. Save public URL in database
+        UserRepo.update_branding(user_id, logo_url=public_url)
         await message.answer(
             "✅ *Логотип загружен!*\n\n"
             "Он будет использоваться в ваших PDF-брифах.",
