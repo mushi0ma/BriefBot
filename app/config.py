@@ -31,7 +31,8 @@ class Settings(BaseSettings):
     openai_api_key: SecretStr | None = None
     google_api_key: SecretStr | None = None
     groq_api_key: SecretStr | None = None
-    ai_provider: str = "gemini"  # gemini, groq, openai
+    openrouter_api_key: SecretStr | None = None
+    ai_provider: str = "gemini"  # gemini, groq, kimi, openai
 
     # ── Supabase ─────────────────────────────
     supabase_url: str

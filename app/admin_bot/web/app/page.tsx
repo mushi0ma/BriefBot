@@ -196,19 +196,25 @@ export default function Dashboard() {
             <h2 className="text-sm font-semibold text-tg-text mb-3">
               Статистика обработки
             </h2>
-            <div className="flex gap-2 items-center mb-2">
+            <div className="w-full flex items-center mb-2">
               <div
-                className="h-2 rounded-full bg-green-500 transition-all duration-700"
+                className="h-2 rounded-l-full bg-green-500 transition-all duration-700"
                 style={{
                   width: `${stats.briefs.total > 0 ? (stats.briefs.successful / stats.briefs.total) * 100 : 0}%`,
-                  minWidth: stats.briefs.successful > 0 ? "8px" : "0px",
+                  minWidth: stats.briefs.successful > 0 ? "4px" : "0px",
                 }}
               />
               <div
-                className="h-2 rounded-full bg-red-500 transition-all duration-700"
+                className="h-2 bg-white/5 transition-all duration-700"
+                style={{
+                  width: `${stats.briefs.total > 0 ? ((stats.briefs.total - stats.briefs.successful - stats.briefs.failed) / stats.briefs.total) * 100 : 100}%`,
+                }}
+              />
+              <div
+                className="h-2 rounded-r-full bg-red-500 transition-all duration-700"
                 style={{
                   width: `${stats.briefs.total > 0 ? (stats.briefs.failed / stats.briefs.total) * 100 : 0}%`,
-                  minWidth: stats.briefs.failed > 0 ? "8px" : "0px",
+                  minWidth: stats.briefs.failed > 0 ? "4px" : "0px",
                 }}
               />
             </div>

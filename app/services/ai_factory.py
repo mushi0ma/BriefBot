@@ -148,18 +148,31 @@ def get_ai_agent() -> ResilientAIAgent:
     """Factory method to get the configured AI agent with Circuit Breaker failover."""
     settings = get_settings()
 
-    # Primary agent
-    from app.services.gemini_agent import GeminiAgent
-    primary = GeminiAgent()
+    provider = settings.ai_provider.lower()
 
-    # Fallback agent
-    try:
-        from app.services.groq_agent import GroqAgent
-        fallback = GroqAgent()
-    except (ValueError, ImportError) as e:
-        logger.warning("groq_fallback_unavailable", error=str(e))
-        # If Groq is not configured, use Gemini as both (no real fallback)
+    if provider == "kimi":
+        # Kimi K2.5 via OpenRouter as primary, Gemini as fallback
+        try:
+            from app.services.openrouter_agent import OpenRouterAgent
+            primary = OpenRouterAgent()
+        except (ValueError, ImportError) as e:
+            logger.warning("kimi_primary_unavailable", error=str(e))
+            from app.services.gemini_agent import GeminiAgent
+            primary = GeminiAgent()
+
+        from app.services.gemini_agent import GeminiAgent
         fallback = GeminiAgent()
+    else:
+        # Default: Gemini primary, Groq fallback
+        from app.services.gemini_agent import GeminiAgent
+        primary = GeminiAgent()
+
+        try:
+            from app.services.groq_agent import GroqAgent
+            fallback = GroqAgent()
+        except (ValueError, ImportError) as e:
+            logger.warning("groq_fallback_unavailable", error=str(e))
+            fallback = GeminiAgent()
 
     return ResilientAIAgent(
         primary=primary,

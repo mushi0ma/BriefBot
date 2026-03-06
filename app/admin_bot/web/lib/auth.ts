@@ -2,10 +2,13 @@
  * Telegram initData HMAC-SHA256 validation.
  * Verifies that requests to API routes originate from the Telegram Mini App.
  *
+ * Uses Node.js built-in crypto (no external deps).
+ * Includes auth_date expiry check (10-min window).
+ *
  * @see https://core.telegram.org/bots/webapps#validating-data-received-via-the-mini-app
  */
 
-import CryptoJS from "crypto-js";
+import crypto from "crypto";
 
 export interface TelegramUser {
     id: number;
@@ -54,12 +57,16 @@ export function validateInitData(initData: string): ValidatedInitData | null {
         const dataCheckString = entries.join("\n");
 
         // HMAC-SHA256("WebAppData", bot_token) → secret_key
-        const secretKey = CryptoJS.HmacSHA256(botToken, "WebAppData");
+        const secretKey = crypto
+            .createHmac("sha256", "WebAppData")
+            .update(botToken)
+            .digest();
 
         // HMAC-SHA256(secret_key, data_check_string) → computed_hash
-        const computedHash = CryptoJS.HmacSHA256(dataCheckString, secretKey).toString(
-            CryptoJS.enc.Hex
-        );
+        const computedHash = crypto
+            .createHmac("sha256", secretKey)
+            .update(dataCheckString)
+            .digest("hex");
 
         if (computedHash !== hash) {
             console.warn("[auth] Hash mismatch");

@@ -7,6 +7,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { validateInitData } from "@/lib/auth";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
+// Prevent static pre-rendering — env vars and DB calls are runtime-only
+export const dynamic = "force-dynamic";
+
 export async function GET(request: NextRequest) {
     // 1. Extract & validate initData
     const authHeader = request.headers.get("Authorization") ?? "";
