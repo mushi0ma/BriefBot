@@ -57,7 +57,7 @@ class Settings(BaseSettings):
     temp_dir: Path = Path("/tmp/briefbot")
 
     # ── Admin Web App ────────────────────────
-    admin_web_app_url: str = "https://your-domain.com"
+    tma_admin_url: str = "https://your-domain.vercel.app"
     admin_web_port: int = 8080
 
 

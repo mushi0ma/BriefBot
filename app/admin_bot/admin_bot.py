@@ -78,7 +78,7 @@ async def cmd_dashboard(message: Message) -> None:
     from aiogram.types import WebAppInfo, InlineKeyboardButton, InlineKeyboardMarkup
 
     settings = get_settings()
-    dashboard_url = f"{settings.admin_web_app_url}/admin/dashboard"
+    dashboard_url = settings.tma_admin_url
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(
