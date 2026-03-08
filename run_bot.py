@@ -1,6 +1,7 @@
 """
 BriefBot entry point.
 Starts both the main and admin Telegram bots concurrently.
+Registers graceful shutdown handlers for Redis storage.
 """
 
 from __future__ import annotations
@@ -8,6 +9,8 @@ from __future__ import annotations
 import asyncio
 import signal
 import sys
+
+from aiogram import Dispatcher
 
 from app.admin_bot.admin_bot import create_admin_bot
 from app.bot.main_bot import create_main_bot
@@ -17,6 +20,14 @@ from app.logger import get_logger, setup_logging
 from scripts.migrate import run_migration
 
 logger = get_logger("main")
+
+
+async def on_shutdown(dp: Dispatcher) -> None:
+    """Graceful shutdown callback — close Redis storage connections."""
+    logger.info("dispatcher_shutting_down")
+    if dp.storage:
+        await dp.storage.close()
+        logger.info("storage_closed")
 
 
 async def start_bots() -> None:
@@ -32,13 +43,17 @@ async def start_bots() -> None:
 
     # Sync templates to Supabase (best-effort)
     try:
-        TemplateDBRepo.sync_to_db()
+        await TemplateDBRepo.sync_to_db()
     except Exception as e:
         logger.warning("template_sync_skipped", error=str(e))
 
     # Create bot instances
     main_bot, main_dp = create_main_bot()
     admin_bot, admin_dp = create_admin_bot()
+
+    # Register graceful shutdown handlers
+    main_dp.shutdown.register(on_shutdown)
+    admin_dp.shutdown.register(on_shutdown)
 
     # Ensure temp directories exist
     settings.temp_dir.mkdir(parents=True, exist_ok=True)

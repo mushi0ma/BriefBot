@@ -1,10 +1,10 @@
 """
-Async Supabase client singleton.
-Provides a shared client for all repository modules.
+Supabase client singleton + async file upload helper.
 """
 
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 
 from supabase import create_client, Client
@@ -27,9 +27,10 @@ def get_supabase() -> Client:
     return _client
 
 
-def upload_file(bucket: str, remote_path: str, file_path: str) -> str:
+async def upload_file(bucket: str, remote_path: str, file_path: str) -> str:
     """
     Upload a file to Supabase Storage and return its public URL.
+    Runs blocking I/O in a thread pool.
 
     Args:
         bucket: Storage bucket name (e.g. 'briefs')
@@ -39,31 +40,33 @@ def upload_file(bucket: str, remote_path: str, file_path: str) -> str:
     Returns:
         Public URL of the uploaded file
     """
-    sb = get_supabase()
-    local = Path(file_path)
 
-    if not local.exists():
-        raise FileNotFoundError(f"File not found: {file_path}")
+    def _inner() -> str:
+        sb = get_supabase()
+        local = Path(file_path)
 
-    with open(file_path, "rb") as f:
-        # Auto-detect content type from extension
-        ext = local.suffix.lower()
-        content_types = {
-            ".pdf": "application/pdf",
-            ".jpg": "image/jpeg",
-            ".jpeg": "image/jpeg",
-            ".png": "image/png",
-            ".webp": "image/webp",
-        }
-        content_type = content_types.get(ext, "application/octet-stream")
+        if not local.exists():
+            raise FileNotFoundError(f"File not found: {file_path}")
 
-        sb.storage.from_(bucket).upload(
-            path=remote_path,
-            file=f,
-            file_options={"content-type": content_type, "upsert": "true"},
-        )
+        with open(file_path, "rb") as f:
+            ext = local.suffix.lower()
+            content_types = {
+                ".pdf": "application/pdf",
+                ".jpg": "image/jpeg",
+                ".jpeg": "image/jpeg",
+                ".png": "image/png",
+                ".webp": "image/webp",
+            }
+            content_type = content_types.get(ext, "application/octet-stream")
 
-    public_url = sb.storage.from_(bucket).get_public_url(remote_path)
-    logger.info("file_uploaded", bucket=bucket, path=remote_path, url=public_url)
-    return public_url
+            sb.storage.from_(bucket).upload(
+                path=remote_path,
+                file=f,
+                file_options={"content-type": content_type, "upsert": "true"},
+            )
 
+        public_url = sb.storage.from_(bucket).get_public_url(remote_path)
+        logger.info("file_uploaded", bucket=bucket, path=remote_path, url=public_url)
+        return public_url
+
+    return await asyncio.to_thread(_inner)

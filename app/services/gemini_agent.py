@@ -2,19 +2,27 @@
 Gemini Agent for native audio-to-brief and text-to-brief processing using Gemini 2.0 Flash.
 Uses the new google-genai SDK with Structured Outputs (response_schema).
 
-v2: Adds response_schema for guaranteed JSON, client_assessment field,
-    and Markdown list instructions in prompts.
+v3: Adds tenacity retries on transient errors and asyncio.to_thread for blocking SDK calls.
 """
 
 from __future__ import annotations
 
+import asyncio
 import json
+import logging
 from pathlib import Path
 from typing import Any
 
 from google import genai
 from google.genai import types
 from pydantic import ValidationError
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential,
+    before_sleep_log,
+    retry_if_exception,
+)
 
 from app.config import get_settings
 from app.logger import get_logger
@@ -22,6 +30,22 @@ from app.models.brief import BriefData, BriefTemplate
 from app.services.analysis import AnalysisError, RateLimitError
 
 logger = get_logger("gemini_agent")
+
+
+def _should_retry(exc: BaseException) -> bool:
+    """Retry on transient errors but NOT on AnalysisError or RateLimitError."""
+    if isinstance(exc, (AnalysisError, RateLimitError)):
+        return False
+    return True
+
+
+_ai_retry = retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=1, max=8),
+    retry=retry_if_exception(_should_retry),
+    before_sleep=before_sleep_log(logger, logging.WARNING),  # type: ignore[arg-type]
+    reraise=True,
+)
 
 
 def _build_response_schema(template: BriefTemplate) -> dict[str, Any]:
@@ -81,6 +105,7 @@ class GeminiAgent:
         self.client = genai.Client(api_key=settings.google_api_key.get_secret_value())
         self.model_name = "gemini-2.0-flash"
 
+    @_ai_retry
     async def process_audio(self, audio_path: str, template: BriefTemplate) -> BriefData:
         """
         Processes audio file directly with Gemini 2.0 Flash to extract brief data.
@@ -93,29 +118,31 @@ class GeminiAgent:
         logger.info("gemini_audio_processing_start", audio_path=audio_path, template=template.slug)
 
         try:
-            # Upload audio file
-            uploaded_file = self.client.files.upload(
-                file=audio_path,
-                config=types.UploadFileConfig(display_name="voice_message"),
-            )
-
             prompt = self._build_audio_prompt(template)
             schema = _build_response_schema(template)
 
-            # Generate content with audio + prompt + structured output
-            response = self.client.models.generate_content(
-                model=self.model_name,
-                contents=[uploaded_file, prompt],
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    response_schema=schema,
-                ),
-            )
+            # Run blocking google-genai SDK calls in thread pool
+            def _sync_call() -> str:
+                uploaded_file = self.client.files.upload(
+                    file=audio_path,
+                    config=types.UploadFileConfig(display_name="voice_message"),
+                )
+                response = self.client.models.generate_content(
+                    model=self.model_name,
+                    contents=[uploaded_file, prompt],
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        response_schema=schema,
+                    ),
+                )
+                return response.text or ""
 
-            if not response.text:
+            raw_text = await asyncio.to_thread(_sync_call)
+
+            if not raw_text:
                 raise AnalysisError("Gemini returned empty response")
 
-            return self._parse_response(response.text, "Processed via Gemini 2.0 Flash")
+            return self._parse_response(raw_text, "Processed via Gemini 2.0 Flash")
 
         except (AnalysisError, RateLimitError):
             raise
@@ -126,6 +153,7 @@ class GeminiAgent:
             logger.error("gemini_processing_failed", error=str(e))
             raise AnalysisError(f"Gemini processing failed: {str(e)}")
 
+    @_ai_retry
     async def process_text(self, text: str, template: BriefTemplate) -> BriefData:
         """
         Processes text input with Gemini 2.0 Flash to extract brief data.
@@ -140,19 +168,23 @@ class GeminiAgent:
             prompt = self._build_text_prompt(template, text)
             schema = _build_response_schema(template)
 
-            response = self.client.models.generate_content(
-                model=self.model_name,
-                contents=[prompt],
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    response_schema=schema,
-                ),
-            )
+            def _sync_call() -> str:
+                response = self.client.models.generate_content(
+                    model=self.model_name,
+                    contents=[prompt],
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        response_schema=schema,
+                    ),
+                )
+                return response.text or ""
 
-            if not response.text:
+            raw_text = await asyncio.to_thread(_sync_call)
+
+            if not raw_text:
                 raise AnalysisError("Gemini returned empty response")
 
-            return self._parse_response(response.text, text)
+            return self._parse_response(raw_text, text)
 
         except (AnalysisError, RateLimitError):
             raise

@@ -262,8 +262,8 @@ async def dashboard():
 async def api_stats():
     """Return aggregated statistics."""
     try:
-        user_stats = UserRepo.get_stats()
-        brief_stats = HistoryRepo.get_stats()
+        user_stats = await UserRepo.get_stats()
+        brief_stats = await HistoryRepo.get_stats()
         return {"users": user_stats, "briefs": brief_stats}
     except Exception as e:
         logger.error("stats_api_error", error=str(e))

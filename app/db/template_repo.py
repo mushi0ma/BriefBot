@@ -1,10 +1,12 @@
 """
 Template repository — manages brief templates from JSON files and Supabase.
 Templates are loaded from bundled JSON files at startup and optionally synced to DB.
+TemplateDBRepo methods are async and offload blocking Supabase I/O via asyncio.to_thread().
 """
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from pathlib import Path
@@ -79,59 +81,71 @@ class TemplateDBRepo:
     TABLE = "templates"
 
     @staticmethod
-    @_retry
-    def sync_to_db() -> None:
+    async def sync_to_db() -> None:
         """Push bundled templates to Supabase (upsert by slug)."""
-        sb = get_supabase()
-        templates = get_all_templates()
-        for slug, tpl in templates.items():
+
+        @_retry
+        def _inner() -> None:
+            sb = get_supabase()
+            templates = get_all_templates()
+            for slug, tpl in templates.items():
+                data = {
+                    "name": tpl.name,
+                    "slug": tpl.slug,
+                    "description": tpl.description,
+                    "sections": [s.model_dump() for s in tpl.sections],
+                    "style": tpl.style.model_dump(),
+                }
+                sb.table(TemplateDBRepo.TABLE).upsert(data, on_conflict="slug").execute()
+            logger.info("templates_synced_to_db", count=len(templates))
+
+        await asyncio.to_thread(_inner)
+
+    @staticmethod
+    async def get_from_db(slug: str) -> dict[str, Any] | None:
+        """Fetch a single template from DB."""
+
+        @_retry
+        def _inner() -> dict[str, Any] | None:
+            sb = get_supabase()
+            result = sb.table(TemplateDBRepo.TABLE).select("*").eq("slug", slug).limit(1).execute()
+            return result.data[0] if result.data else None
+
+        return await asyncio.to_thread(_inner)
+
+    @staticmethod
+    async def save_template(template: BriefTemplate) -> None:
+        """Save a single template to Supabase and to local JSON file."""
+
+        @_retry
+        def _inner() -> None:
+            sb = get_supabase()
             data = {
-                "name": tpl.name,
-                "slug": tpl.slug,
-                "description": tpl.description,
-                "sections": [s.model_dump() for s in tpl.sections],
-                "style": tpl.style.model_dump(),
+                "name": template.name,
+                "slug": template.slug,
+                "description": template.description,
+                "sections": [s.model_dump() for s in template.sections],
+                "style": template.style.model_dump(),
             }
             sb.table(TemplateDBRepo.TABLE).upsert(data, on_conflict="slug").execute()
-        logger.info("templates_synced_to_db", count=len(templates))
 
-    @staticmethod
-    @_retry
-    def get_from_db(slug: str) -> dict[str, Any] | None:
-        """Fetch a single template from DB."""
-        sb = get_supabase()
-        result = sb.table(TemplateDBRepo.TABLE).select("*").eq("slug", slug).limit(1).execute()
-        return result.data[0] if result.data else None
+            # Also save to local JSON file for persistence
+            templates_dir = Path(__file__).resolve().parent.parent / "templates"
+            templates_dir.mkdir(parents=True, exist_ok=True)
+            json_path = templates_dir / f"{template.slug}.json"
+            with open(json_path, "w", encoding="utf-8") as f:
+                json.dump(
+                    {
+                        "name": template.name,
+                        "slug": template.slug,
+                        "description": template.description,
+                        "sections": [s.model_dump() for s in template.sections],
+                        "style": template.style.model_dump(),
+                    },
+                    f,
+                    ensure_ascii=False,
+                    indent=2,
+                )
+            logger.info("template_saved", slug=template.slug)
 
-    @staticmethod
-    @_retry
-    def save_template(template: BriefTemplate) -> None:
-        """Save a single template to Supabase and to local JSON file."""
-        sb = get_supabase()
-        data = {
-            "name": template.name,
-            "slug": template.slug,
-            "description": template.description,
-            "sections": [s.model_dump() for s in template.sections],
-            "style": template.style.model_dump(),
-        }
-        sb.table(TemplateDBRepo.TABLE).upsert(data, on_conflict="slug").execute()
-
-        # Also save to local JSON file for persistence
-        templates_dir = Path(__file__).resolve().parent.parent / "templates"
-        templates_dir.mkdir(parents=True, exist_ok=True)
-        json_path = templates_dir / f"{template.slug}.json"
-        with open(json_path, "w", encoding="utf-8") as f:
-            json.dump(
-                {
-                    "name": template.name,
-                    "slug": template.slug,
-                    "description": template.description,
-                    "sections": [s.model_dump() for s in template.sections],
-                    "style": template.style.model_dump(),
-                },
-                f,
-                ensure_ascii=False,
-                indent=2,
-            )
-        logger.info("template_saved", slug=template.slug)
+        await asyncio.to_thread(_inner)

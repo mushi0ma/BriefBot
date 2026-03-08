@@ -21,16 +21,17 @@ def mock_orchestrator():
          patch("app.services.orchestrator.HistoryRepo") as mock_history_repo, \
          patch("app.services.orchestrator.get_template") as mock_get_template, \
          patch("app.services.orchestrator.notify_admin", new_callable=AsyncMock) as mock_notify, \
+         patch("app.services.orchestrator.upload_file", new_callable=AsyncMock, return_value="https://cdn.example.com/brief.pdf") as mock_upload, \
          patch("app.services.orchestrator.get_ai_agent") as mock_get_ai, \
          patch("app.services.orchestrator.get_cache") as mock_get_cache:
 
-        # Mock user repo
-        mock_user_repo.get_or_create.return_value = {"id": "user-123", "telegram_id": 12345}
-        mock_user_repo.increment_briefs.return_value = None
+        # Mock user repo (async methods)
+        mock_user_repo.get_or_create = AsyncMock(return_value={"id": "user-123", "telegram_id": 12345})
+        mock_user_repo.increment_briefs = AsyncMock(return_value=None)
 
-        # Mock history repo
-        mock_history_repo.create.return_value = {"id": "history-456"}
-        mock_history_repo.update.return_value = None
+        # Mock history repo (async methods)
+        mock_history_repo.create = AsyncMock(return_value={"id": "history-456"})
+        mock_history_repo.update = AsyncMock(return_value=None)
 
         # Mock template
         from app.models.brief import BriefTemplate, TemplateSection

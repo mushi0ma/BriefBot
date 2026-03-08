@@ -1,6 +1,7 @@
 """
 Tests for DB repository retry logic (UserRepo, HistoryRepo, TemplateDBRepo).
 Verifies that the @retry decorator retries on transient failures.
+All repo methods are now async.
 """
 
 from __future__ import annotations
@@ -17,8 +18,9 @@ import pytest
 class TestUserRepoRetry:
     """Verify UserRepo methods retry up to 3 times on failure."""
 
+    @pytest.mark.asyncio
     @patch("app.db.user_repo.get_supabase")
-    def test_get_or_create_retries_and_succeeds(self, mock_get_sb):
+    async def test_get_or_create_retries_and_succeeds(self, mock_get_sb):
         """Should succeed on the 3rd attempt after 2 transient failures."""
         mock_sb = MagicMock()
         mock_get_sb.return_value = mock_sb
@@ -46,13 +48,14 @@ class TestUserRepoRetry:
         mock_limit.execute.side_effect = execute_side_effect
 
         from app.db.user_repo import UserRepo
-        user = UserRepo.get_or_create(111, "testuser")
+        user = await UserRepo.get_or_create(111, "testuser")
 
         assert user["id"] == "user-1"
         assert call_count == 3
 
+    @pytest.mark.asyncio
     @patch("app.db.user_repo.get_supabase")
-    def test_get_or_create_fails_after_3_attempts(self, mock_get_sb):
+    async def test_get_or_create_fails_after_3_attempts(self, mock_get_sb):
         """Should re-raise after exhausting 3 retry attempts."""
         mock_sb = MagicMock()
         mock_get_sb.return_value = mock_sb
@@ -69,12 +72,13 @@ class TestUserRepoRetry:
 
         from app.db.user_repo import UserRepo
         with pytest.raises(ConnectionError, match="persistent DB error"):
-            UserRepo.get_or_create(222, "fail_user")
+            await UserRepo.get_or_create(222, "fail_user")
 
         assert mock_limit.execute.call_count == 3
 
+    @pytest.mark.asyncio
     @patch("app.db.user_repo.get_supabase")
-    def test_get_all_users_retries(self, mock_get_sb):
+    async def test_get_all_users_retries(self, mock_get_sb):
         """get_all_users should retry on failure."""
         mock_sb = MagicMock()
         mock_get_sb.return_value = mock_sb
@@ -99,7 +103,7 @@ class TestUserRepoRetry:
         mock_order.execute.side_effect = execute_side_effect
 
         from app.db.user_repo import UserRepo
-        users = UserRepo.get_all_users()
+        users = await UserRepo.get_all_users()
 
         assert len(users) == 2
         assert call_count == 2
@@ -112,8 +116,9 @@ class TestUserRepoRetry:
 class TestHistoryRepoRetry:
     """Verify HistoryRepo retries on transient failures."""
 
+    @pytest.mark.asyncio
     @patch("app.db.history_repo.get_supabase")
-    def test_create_retries_and_succeeds(self, mock_get_sb):
+    async def test_create_retries_and_succeeds(self, mock_get_sb):
         """create() should succeed on 2nd attempt after 1 failure."""
         mock_sb = MagicMock()
         mock_get_sb.return_value = mock_sb
@@ -136,15 +141,16 @@ class TestHistoryRepoRetry:
         mock_insert.execute.side_effect = execute_side_effect
 
         from app.db.history_repo import HistoryRepo
-        record = HistoryRepo.create(
+        record = await HistoryRepo.create(
             user_id="user-1", telegram_id=111, template_slug="default"
         )
 
         assert record["id"] == "hist-1"
         assert call_count == 2
 
+    @pytest.mark.asyncio
     @patch("app.db.history_repo.get_supabase")
-    def test_create_fails_after_3_attempts(self, mock_get_sb):
+    async def test_create_fails_after_3_attempts(self, mock_get_sb):
         """create() should re-raise after 3 failures."""
         mock_sb = MagicMock()
         mock_get_sb.return_value = mock_sb
@@ -157,7 +163,7 @@ class TestHistoryRepoRetry:
 
         from app.db.history_repo import HistoryRepo
         with pytest.raises(ConnectionError, match="persistent"):
-            HistoryRepo.create(
+            await HistoryRepo.create(
                 user_id="user-1", telegram_id=111, template_slug="default"
             )
 
@@ -171,9 +177,10 @@ class TestHistoryRepoRetry:
 class TestTemplateDBRepoRetry:
     """Verify TemplateDBRepo retries on transient failures."""
 
+    @pytest.mark.asyncio
     @patch("app.db.template_repo.get_all_templates")
     @patch("app.db.template_repo.get_supabase")
-    def test_sync_to_db_retries(self, mock_get_sb, mock_get_templates):
+    async def test_sync_to_db_retries(self, mock_get_sb, mock_get_templates):
         """sync_to_db() should retry on transient DB failure."""
         from app.models.brief import BriefTemplate, TemplateSection
 
@@ -204,6 +211,6 @@ class TestTemplateDBRepoRetry:
         mock_upsert.execute.side_effect = execute_side_effect
 
         from app.db.template_repo import TemplateDBRepo
-        TemplateDBRepo.sync_to_db()
+        await TemplateDBRepo.sync_to_db()
 
         assert call_count == 2

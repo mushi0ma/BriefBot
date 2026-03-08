@@ -35,7 +35,7 @@ from app.bot.keyboards import (
     settings_keyboard,
     template_selection_keyboard,
 )
-from app.bot.middlewares import ErrorHandlerMiddleware, LoggingMiddleware
+from app.bot.middlewares import ErrorHandlerMiddleware, LoggingMiddleware, ThrottlingMiddleware
 from app.bot.states import BriefState
 from app.config import get_settings
 from app.db.history_repo import HistoryRepo
@@ -216,7 +216,7 @@ async def on_history_pdf(callback: CallbackQuery, bot: Bot) -> None:
     history_id = callback.data.split(":", 2)[2]
     await callback.answer("Генерирую PDF...")
 
-    record = HistoryRepo.get_by_id(history_id)
+    record = await HistoryRepo.get_by_id(history_id)
     if not record:
         await bot.send_message(callback.message.chat.id, "Запись не найдена.")
         return
@@ -262,7 +262,7 @@ async def _show_history_page(
     message: Message, user_id: int, page: int, edit: bool
 ) -> None:
     """Show a page of history items with navigation."""
-    items, total = HistoryRepo.get_user_history_paginated(user_id, page, HISTORY_PER_PAGE)
+    items, total = await HistoryRepo.get_user_history_paginated(user_id, page, HISTORY_PER_PAGE)
     total_pages = max(1, math.ceil(total / HISTORY_PER_PAGE))
 
     if not items and page == 1:
@@ -524,13 +524,13 @@ async def handle_logo_upload(message: Message, state: FSMContext, bot: Bot) -> N
         # 2. Upload to Supabase Storage
         from app.db.supabase_client import upload_file as sb_upload
         remote_path = f"{user_id}/logo.jpg"
-        public_url = sb_upload("brand_assets", remote_path, local_path)
+        public_url = await sb_upload("brand_assets", remote_path, local_path)
 
         # 3. Cleanup local file
         Path(local_path).unlink(missing_ok=True)
 
         # 4. Save public URL in database
-        UserRepo.update_branding(user_id, logo_url=public_url)
+        await UserRepo.update_branding(user_id, logo_url=public_url)
         await message.answer(
             "✅ *Логотип загружен!*\n\n"
             "Он будет использоваться в ваших PDF-брифах.",
@@ -746,7 +746,7 @@ async def on_draft_generate_pdf(callback: CallbackQuery, state: FSMContext, bot:
     brand_color = None
     logo_url = None
     try:
-        user_data = UserRepo.get_or_create(user_id, username or "")
+        user_data = await UserRepo.get_or_create(user_id, username or "")
         brand_color = user_data.get("brand_color")
         logo_url = user_data.get("logo_url")
     except Exception:
@@ -832,7 +832,7 @@ async def cmd_settings(message: Message) -> None:
     # Try to get current branding
     brand_info = ""
     try:
-        user_data = UserRepo.get_or_create(user_id, "")
+        user_data = await UserRepo.get_or_create(user_id, "")
         brand_color = user_data.get("brand_color", "")
         logo = user_data.get("logo_url", "")
         if brand_color:
@@ -868,7 +868,7 @@ async def on_color_selected(callback: CallbackQuery) -> None:
     user_id = callback.from_user.id if callback.from_user else 0
 
     try:
-        UserRepo.update_branding(user_id, brand_color=color)
+        await UserRepo.update_branding(user_id, brand_color=color)
         await callback.answer(f"Цвет выбран: {color}")
         await callback.message.edit_text(
             f"✅ Цвет акцента обновлён: `{color}`\n\n"
@@ -959,6 +959,7 @@ def create_main_bot() -> tuple[Bot, Dispatcher]:
     # Register middlewares
     dp.update.middleware(LoggingMiddleware())
     dp.update.middleware(ErrorHandlerMiddleware())
+    dp.update.middleware(ThrottlingMiddleware(redis_url=settings.redis_url))
 
     # Include router
     dp.include_router(router)

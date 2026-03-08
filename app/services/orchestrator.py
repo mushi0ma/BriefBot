@@ -1,10 +1,12 @@
 """
 Orchestrator Agent — Coordinates the full voice->brief->PDF and text->brief->PDF pipelines.
-v6: Adds audio cleanup, RateLimitError handling, file_id-based caching.
+v7: All repo/storage calls are now async (asyncio.to_thread).
+    Added PDF cleanup in finally blocks for all pipelines.
 """
 
 from __future__ import annotations
 
+import os
 import time
 from pathlib import Path
 from typing import Any
@@ -31,7 +33,7 @@ RATE_LIMIT_MSG = (
 class OrchestratorAgent:
     """
     Coordinates the BriefBot pipeline.
-    v6: audio cleanup, rate-limit handling, file_id cache keys.
+    v7: async repos, PDF cleanup, audio cleanup.
     """
 
     def __init__(self) -> None:
@@ -57,14 +59,15 @@ class OrchestratorAgent:
         """
         start_time = time.monotonic()
         history_id: str | None = None
+        pdf_path: str | None = None
 
         try:
             # 0. User & Template prep
-            user = UserRepo.get_or_create(telegram_id, username or "")
+            user = await UserRepo.get_or_create(telegram_id, username or "")
             template = get_template(template_slug)
 
             # Create initial history record
-            history = HistoryRepo.create(
+            history = await HistoryRepo.create(
                 user_id=user["id"],
                 telegram_id=telegram_id,
                 template_slug=template_slug,
@@ -81,7 +84,7 @@ class OrchestratorAgent:
             else:
                 # 2. AI Processing (Multimodal)
                 logger.info("pipeline_ai_start", user_id=telegram_id, provider=type(self.ai).__name__)
-                self._update_history(history_id, ProcessingState.ANALYZING)
+                await self._update_history(history_id, ProcessingState.ANALYZING)
 
                 brief_data = await self.ai.process_audio(audio_path, template)
 
@@ -89,7 +92,7 @@ class OrchestratorAgent:
                 await self.cache.set(cache_key, template_slug, brief_data)
 
             # 3. PDF Generation
-            self._update_history(history_id, ProcessingState.GENERATING_PDF)
+            await self._update_history(history_id, ProcessingState.GENERATING_PDF)
             pdf_path = generate_pdf(brief_data, template)
 
             # 3b. Upload PDF to Supabase Storage
@@ -97,7 +100,7 @@ class OrchestratorAgent:
             try:
                 remote_name = Path(pdf_path).name
                 remote_path = f"{telegram_id}/{remote_name}"
-                pdf_url = upload_file("briefs", remote_path, pdf_path)
+                pdf_url = await upload_file("briefs", remote_path, pdf_path)
                 logger.info("pdf_uploaded", user_id=telegram_id, url=pdf_url)
             except Exception as upload_err:
                 logger.warning("pdf_upload_failed", error=str(upload_err))
@@ -105,7 +108,7 @@ class OrchestratorAgent:
             # 4. Final Logs & Stats
             elapsed_ms = int((time.monotonic() - start_time) * 1000)
 
-            HistoryRepo.update(
+            await HistoryRepo.update(
                 history_id,
                 processing_state=ProcessingState.DONE.value,
                 original_text=brief_data.original_text,
@@ -113,7 +116,7 @@ class OrchestratorAgent:
                 pdf_url=pdf_url,
                 processing_time_ms=elapsed_ms,
             )
-            UserRepo.increment_briefs(telegram_id)
+            await UserRepo.increment_briefs(telegram_id)
 
             logger.info("pipeline_completed", user_id=telegram_id, duration=elapsed_ms)
 
@@ -128,7 +131,7 @@ class OrchestratorAgent:
             elapsed_ms = int((time.monotonic() - start_time) * 1000)
             logger.warning("pipeline_rate_limited", user_id=telegram_id)
             if history_id:
-                HistoryRepo.update(
+                await HistoryRepo.update(
                     history_id,
                     processing_state=ProcessingState.FAILED.value,
                     error_message="rate_limit",
@@ -145,7 +148,7 @@ class OrchestratorAgent:
             logger.error("pipeline_failed", error=str(e), user_id=telegram_id)
 
             if history_id:
-                HistoryRepo.update(
+                await HistoryRepo.update(
                     history_id,
                     processing_state=ProcessingState.FAILED.value,
                     error_message=str(e),
@@ -163,7 +166,10 @@ class OrchestratorAgent:
 
         finally:
             # Cleanup: delete the downloaded audio file
-            self._cleanup_audio(audio_path)
+            self._cleanup_file(audio_path)
+            # Cleanup: delete the local PDF after sending
+            if pdf_path:
+                self._cleanup_file(pdf_path)
 
     async def process_text(
         self,
@@ -179,14 +185,15 @@ class OrchestratorAgent:
         """
         start_time = time.monotonic()
         history_id: str | None = None
+        pdf_path: str | None = None
 
         try:
             # 0. User & Template prep
-            user = UserRepo.get_or_create(telegram_id, username or "")
+            user = await UserRepo.get_or_create(telegram_id, username or "")
             template = get_template(template_slug)
 
             # Create initial history record
-            history = HistoryRepo.create(
+            history = await HistoryRepo.create(
                 user_id=user["id"],
                 telegram_id=telegram_id,
                 template_slug=template_slug,
@@ -196,12 +203,12 @@ class OrchestratorAgent:
 
             # 1. AI Processing (Text-only, no STT)
             logger.info("pipeline_text_start", user_id=telegram_id, provider=type(self.ai).__name__)
-            self._update_history(history_id, ProcessingState.ANALYZING)
+            await self._update_history(history_id, ProcessingState.ANALYZING)
 
             brief_data = await self.ai.process_text(text, template)
 
             # 2. PDF Generation
-            self._update_history(history_id, ProcessingState.GENERATING_PDF)
+            await self._update_history(history_id, ProcessingState.GENERATING_PDF)
             pdf_path = generate_pdf(brief_data, template)
 
             # 2b. Upload PDF to Supabase Storage
@@ -209,7 +216,7 @@ class OrchestratorAgent:
             try:
                 remote_name = Path(pdf_path).name
                 remote_path = f"{telegram_id}/{remote_name}"
-                pdf_url = upload_file("briefs", remote_path, pdf_path)
+                pdf_url = await upload_file("briefs", remote_path, pdf_path)
                 logger.info("pdf_uploaded", user_id=telegram_id, url=pdf_url)
             except Exception as upload_err:
                 logger.warning("pdf_upload_failed", error=str(upload_err))
@@ -217,7 +224,7 @@ class OrchestratorAgent:
             # 3. Final Logs & Stats
             elapsed_ms = int((time.monotonic() - start_time) * 1000)
 
-            HistoryRepo.update(
+            await HistoryRepo.update(
                 history_id,
                 processing_state=ProcessingState.DONE.value,
                 original_text=text,
@@ -225,7 +232,7 @@ class OrchestratorAgent:
                 pdf_url=pdf_url,
                 processing_time_ms=elapsed_ms,
             )
-            UserRepo.increment_briefs(telegram_id)
+            await UserRepo.increment_briefs(telegram_id)
 
             logger.info("pipeline_text_completed", user_id=telegram_id, duration=elapsed_ms)
 
@@ -240,7 +247,7 @@ class OrchestratorAgent:
             elapsed_ms = int((time.monotonic() - start_time) * 1000)
             logger.warning("pipeline_text_rate_limited", user_id=telegram_id)
             if history_id:
-                HistoryRepo.update(
+                await HistoryRepo.update(
                     history_id,
                     processing_state=ProcessingState.FAILED.value,
                     error_message="rate_limit",
@@ -257,7 +264,7 @@ class OrchestratorAgent:
             logger.error("pipeline_text_failed", error=str(e), user_id=telegram_id)
 
             if history_id:
-                HistoryRepo.update(
+                await HistoryRepo.update(
                     history_id,
                     processing_state=ProcessingState.FAILED.value,
                     error_message=str(e),
@@ -271,6 +278,10 @@ class OrchestratorAgent:
                 error_message="Произошла ошибка при обработке текста. Попробуйте позже.",
                 processing_time_ms=elapsed_ms,
             )
+
+        finally:
+            if pdf_path:
+                self._cleanup_file(pdf_path)
 
     async def process_with_brief_data(
         self,
@@ -289,14 +300,15 @@ class OrchestratorAgent:
         """
         start_time = time.monotonic()
         history_id: str | None = None
+        pdf_path: str | None = None
 
         try:
             # 0. User & Template prep
-            user = UserRepo.get_or_create(telegram_id, username or "")
+            user = await UserRepo.get_or_create(telegram_id, username or "")
             template = get_template(template_slug)
 
             # Create history record
-            history = HistoryRepo.create(
+            history = await HistoryRepo.create(
                 user_id=user["id"],
                 telegram_id=telegram_id,
                 template_slug=template_slug,
@@ -305,7 +317,7 @@ class OrchestratorAgent:
             history_id = history["id"]
 
             # 1. PDF Generation (AI already done)
-            self._update_history(history_id, ProcessingState.GENERATING_PDF)
+            await self._update_history(history_id, ProcessingState.GENERATING_PDF)
             pdf_path = generate_pdf(
                 brief_data, template,
                 brand_color=brand_color,
@@ -317,7 +329,7 @@ class OrchestratorAgent:
             try:
                 remote_name = Path(pdf_path).name
                 remote_path = f"{telegram_id}/{remote_name}"
-                pdf_url = upload_file("briefs", remote_path, pdf_path)
+                pdf_url = await upload_file("briefs", remote_path, pdf_path)
                 logger.info("pdf_uploaded", user_id=telegram_id, url=pdf_url)
             except Exception as upload_err:
                 logger.warning("pdf_upload_failed", error=str(upload_err))
@@ -325,7 +337,7 @@ class OrchestratorAgent:
             # 2. Final Logs & Stats
             elapsed_ms = int((time.monotonic() - start_time) * 1000)
 
-            HistoryRepo.update(
+            await HistoryRepo.update(
                 history_id,
                 processing_state=ProcessingState.DONE.value,
                 original_text=original_text,
@@ -333,7 +345,7 @@ class OrchestratorAgent:
                 pdf_url=pdf_url,
                 processing_time_ms=elapsed_ms,
             )
-            UserRepo.increment_briefs(telegram_id)
+            await UserRepo.increment_briefs(telegram_id)
 
             logger.info("pipeline_draft_completed", user_id=telegram_id, duration=elapsed_ms)
 
@@ -349,7 +361,7 @@ class OrchestratorAgent:
             logger.error("pipeline_draft_failed", error=str(e), user_id=telegram_id)
 
             if history_id:
-                HistoryRepo.update(
+                await HistoryRepo.update(
                     history_id,
                     processing_state=ProcessingState.FAILED.value,
                     error_message=str(e),
@@ -364,19 +376,23 @@ class OrchestratorAgent:
                 processing_time_ms=elapsed_ms,
             )
 
-    @staticmethod
-    def _update_history(history_id: str | None, state: ProcessingState) -> None:
-        """Update history record with new processing state."""
-        if history_id:
-            HistoryRepo.update(history_id, processing_state=state.value)
+        finally:
+            if pdf_path:
+                self._cleanup_file(pdf_path)
 
     @staticmethod
-    def _cleanup_audio(audio_path: str) -> None:
-        """Delete the temporary audio file after processing."""
+    async def _update_history(history_id: str | None, state: ProcessingState) -> None:
+        """Update history record with new processing state."""
+        if history_id:
+            await HistoryRepo.update(history_id, processing_state=state.value)
+
+    @staticmethod
+    def _cleanup_file(filepath: str) -> None:
+        """Delete a temporary file (audio or PDF) after processing."""
         try:
-            p = Path(audio_path)
+            p = Path(filepath)
             if p.exists():
                 p.unlink()
-                logger.debug("audio_file_cleaned", path=audio_path)
+                logger.debug("file_cleaned", path=filepath)
         except Exception as e:
-            logger.warning("audio_cleanup_failed", path=audio_path, error=str(e))
+            logger.warning("file_cleanup_failed", path=filepath, error=str(e))

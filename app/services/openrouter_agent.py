@@ -2,16 +2,27 @@
 OpenRouter Agent — AI provider using Kimi K2.5 via OpenRouter API.
 Uses the OpenAI-compatible endpoint at https://openrouter.ai/api/v1.
 Optimized for high-quality brief/document generation.
+
+v2: Adds tenacity retries on transient errors and asyncio.to_thread for blocking Groq Whisper.
 """
 
 from __future__ import annotations
 
+import asyncio
 import json
+import logging
 import re
 from pathlib import Path
 
 from openai import AsyncOpenAI
 from pydantic import ValidationError
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential,
+    before_sleep_log,
+    retry_if_exception,
+)
 
 from app.config import get_settings
 from app.logger import get_logger
@@ -22,6 +33,22 @@ logger = get_logger("openrouter_agent")
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 KIMI_MODEL = "moonshotai/kimi-k2.5"
+
+
+def _should_retry(exc: BaseException) -> bool:
+    """Retry on transient errors but NOT on AnalysisError or RateLimitError."""
+    if isinstance(exc, (AnalysisError, RateLimitError)):
+        return False
+    return True
+
+
+_ai_retry = retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=1, max=8),
+    retry=retry_if_exception(_should_retry),
+    before_sleep=before_sleep_log(logger, logging.WARNING),  # type: ignore[arg-type]
+    reraise=True,
+)
 
 
 def _is_rate_limit_error(exc: Exception) -> bool:
@@ -82,6 +109,7 @@ class OpenRouterAgent:
             from groq import Groq
             self._groq_client = Groq(api_key=settings.groq_api_key.get_secret_value())
 
+    @_ai_retry
     async def process_audio(self, audio_path: str, template: BriefTemplate) -> BriefData:
         """
         Processes audio: transcribe via Groq Whisper, then analyze text via Kimi K2.5.
@@ -96,16 +124,18 @@ class OpenRouterAgent:
         logger.info("kimi_audio_processing_start", audio_path=audio_path, template=template.slug)
 
         try:
-            # Step 1: Transcribe with Groq Whisper
-            with open(audio_path, "rb") as f:
-                transcription = self._groq_client.audio.transcriptions.create(
-                    model="whisper-large-v3",
-                    file=f,
-                    language="ru",
-                    response_format="text",
-                )
+            # Step 1: Transcribe with Groq Whisper (sync SDK → thread pool)
+            def _transcribe() -> str:
+                with open(audio_path, "rb") as f:
+                    transcription = self._groq_client.audio.transcriptions.create(
+                        model="whisper-large-v3",
+                        file=f,
+                        language="ru",
+                        response_format="text",
+                    )
+                return str(transcription).strip()
 
-            transcript = str(transcription).strip()
+            transcript = await asyncio.to_thread(_transcribe)
             if not transcript:
                 raise AnalysisError("Groq Whisper returned empty transcription")
 
@@ -123,6 +153,7 @@ class OpenRouterAgent:
             logger.error("kimi_audio_processing_failed", error=str(e))
             raise AnalysisError(f"Kimi processing failed: {str(e)}")
 
+    @_ai_retry
     async def process_text(self, text: str, template: BriefTemplate) -> BriefData:
         """Processes text input with Kimi K2.5 to extract brief data."""
         if not text.strip():
@@ -142,7 +173,7 @@ class OpenRouterAgent:
             raise AnalysisError(f"Kimi text processing failed: {str(e)}")
 
     async def _analyze_text(self, text: str, template: BriefTemplate) -> BriefData:
-        """Core text analysis using Kimi K2.5."""
+        """Core text analysis using Kimi K2.5 (already async via AsyncOpenAI)."""
         sections_str = "\n".join([f"- {s.key}: {s.title} ({s.hint})" for s in template.sections])
 
         system_prompt = f"""Ты — эксперт бизнес-аналитик. Проанализируй текст клиента и извлеки ключевые детали в структурированный JSON-бриф.

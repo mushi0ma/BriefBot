@@ -5,7 +5,7 @@ services:
   bot:
     build: .
     container_name: briefbot-bot
-    command: sh -c "python scripts/migrate.py && python run_bot.py"
+    command: python run_bot.py
     env_file: .env
     depends_on:
       redis:

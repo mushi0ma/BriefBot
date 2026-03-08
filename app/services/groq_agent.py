@@ -2,15 +2,26 @@
 Groq Agent — fallback AI provider using Groq (Llama-3) for text processing
 and Groq Whisper for audio transcription.
 Used as a Circuit Breaker fallback when Gemini is unavailable.
+
+v2: Adds tenacity retries on transient errors and asyncio.to_thread for blocking SDK calls.
 """
 
 from __future__ import annotations
 
+import asyncio
 import json
+import logging
 from pathlib import Path
 
 from groq import Groq
 from pydantic import ValidationError
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential,
+    before_sleep_log,
+    retry_if_exception,
+)
 
 from app.config import get_settings
 from app.logger import get_logger
@@ -18,6 +29,22 @@ from app.models.brief import BriefData, BriefTemplate
 from app.services.analysis import AnalysisError, RateLimitError
 
 logger = get_logger("groq_agent")
+
+
+def _should_retry(exc: BaseException) -> bool:
+    """Retry on transient errors but NOT on AnalysisError or RateLimitError."""
+    if isinstance(exc, (AnalysisError, RateLimitError)):
+        return False
+    return True
+
+
+_ai_retry = retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=1, max=8),
+    retry=retry_if_exception(_should_retry),
+    before_sleep=before_sleep_log(logger, logging.WARNING),  # type: ignore[arg-type]
+    reraise=True,
+)
 
 
 def _is_rate_limit_error(exc: Exception) -> bool:
@@ -42,6 +69,7 @@ class GroqAgent:
         self.text_model = "llama-3.3-70b-versatile"
         self.whisper_model = "whisper-large-v3"
 
+    @_ai_retry
     async def process_audio(self, audio_path: str, template: BriefTemplate) -> BriefData:
         """
         Processes audio: transcribe via Groq Whisper, then analyze text via Llama-3.
@@ -53,16 +81,18 @@ class GroqAgent:
         logger.info("groq_audio_processing_start", audio_path=audio_path, template=template.slug)
 
         try:
-            # Step 1: Transcribe with Whisper
-            with open(audio_path, "rb") as f:
-                transcription = self.client.audio.transcriptions.create(
-                    model=self.whisper_model,
-                    file=f,
-                    language="ru",
-                    response_format="text",
-                )
+            # Step 1: Transcribe with Whisper (sync SDK → thread pool)
+            def _transcribe() -> str:
+                with open(audio_path, "rb") as f:
+                    transcription = self.client.audio.transcriptions.create(
+                        model=self.whisper_model,
+                        file=f,
+                        language="ru",
+                        response_format="text",
+                    )
+                return str(transcription).strip()
 
-            transcript = str(transcription).strip()
+            transcript = await asyncio.to_thread(_transcribe)
             if not transcript:
                 raise AnalysisError("Groq Whisper returned empty transcription")
 
@@ -80,6 +110,7 @@ class GroqAgent:
             logger.error("groq_audio_processing_failed", error=str(e))
             raise AnalysisError(f"Groq processing failed: {str(e)}")
 
+    @_ai_retry
     async def process_text(self, text: str, template: BriefTemplate) -> BriefData:
         """Processes text input with Groq Llama-3 to extract brief data."""
         if not text.strip():
@@ -99,7 +130,7 @@ class GroqAgent:
             raise AnalysisError(f"Groq text processing failed: {str(e)}")
 
     async def _analyze_text(self, text: str, template: BriefTemplate) -> BriefData:
-        """Core text analysis using Llama-3."""
+        """Core text analysis using Llama-3 (sync SDK → thread pool)."""
         sections_str = "\n".join([f"- {s.key}: {s.title} ({s.hint})" for s in template.sections])
 
         system_prompt = f"""You are an expert business assistant. Analyze the client text and extract key business details into a JSON brief.
@@ -120,18 +151,20 @@ RULES:
 5. Language: Russian.
 6. Be precise and professional."""
 
-        response = self.client.chat.completions.create(
-            model=self.text_model,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": text},
-            ],
-            response_format={"type": "json_object"},
-            temperature=0.3,
-            max_tokens=4096,
-        )
+        def _sync_call() -> str:
+            response = self.client.chat.completions.create(
+                model=self.text_model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": text},
+                ],
+                response_format={"type": "json_object"},
+                temperature=0.3,
+                max_tokens=4096,
+            )
+            return response.choices[0].message.content or ""
 
-        raw_json = response.choices[0].message.content
+        raw_json = await asyncio.to_thread(_sync_call)
         if not raw_json:
             raise AnalysisError("Groq returned empty response")
 

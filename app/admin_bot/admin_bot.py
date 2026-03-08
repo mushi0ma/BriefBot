@@ -102,8 +102,8 @@ async def cmd_stats(message: Message) -> None:
     if not _is_admin(message):
         return
 
-    user_stats = UserRepo.get_stats()
-    brief_stats = HistoryRepo.get_stats()
+    user_stats = await UserRepo.get_stats()
+    brief_stats = await HistoryRepo.get_stats()
 
     text = (
         "📊 *Статистика BriefBot*\n\n"
@@ -184,7 +184,7 @@ async def cmd_users(message: Message) -> None:
     if not _is_admin(message):
         return
 
-    users = UserRepo.get_all_users()[:10]
+    users = (await UserRepo.get_all_users())[:10]
     if not users:
         await message.answer("📭 Пока нет зарегистрированных пользователей.")
         return
@@ -240,8 +240,8 @@ async def cmd_export(message: Message) -> None:
     await message.answer("📦 Подготавливаю экспорт данных...")
 
     try:
-        users = UserRepo.get_all_users()
-        history = HistoryRepo.get_all_history()
+        users = await UserRepo.get_all_users()
+        history = await HistoryRepo.get_all_history()
 
         # Users CSV
         users_file = _build_csv(
@@ -314,7 +314,7 @@ async def cmd_broadcast(message: Message) -> None:
         )
         return
 
-    users = UserRepo.get_all_users()
+    users = await UserRepo.get_all_users()
     active_users = [u for u in users if not u.get("is_blocked")]
 
     # Store pending broadcast
@@ -347,7 +347,7 @@ async def on_broadcast_confirm(callback: CallbackQuery) -> None:
     await callback.message.edit_text("📢 *Рассылка в процессе...*", parse_mode="Markdown")
 
     settings = get_settings()
-    users = UserRepo.get_all_users()
+    users = await UserRepo.get_all_users()
     active_users = [u for u in users if not u.get("is_blocked")]
 
     sent = 0
@@ -422,7 +422,7 @@ async def handle_template_upload(message: Message, bot: Bot) -> None:
         template = BriefTemplate(**data)
 
         # Save to Supabase and local file
-        TemplateDBRepo.save_template(template)
+        await TemplateDBRepo.save_template(template)
 
         # Reload in-memory cache
         reload_templates()
