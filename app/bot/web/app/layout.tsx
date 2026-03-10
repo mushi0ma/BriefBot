@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Script from "next/script";
 import "./globals.css";
-import TelegramProvider from "./TelegramProvider";
+import { TelegramProvider } from "@/src/shared/lib/telegram";
 
 export const metadata: Metadata = {
   title: "BriefBot — Личный кабинет",
