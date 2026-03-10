@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { validateInitData } from "@/lib/auth";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { SettingsPatchSchema } from "@/lib/schemas/settings";
 
 export const dynamic = "force-dynamic";
 
@@ -40,7 +41,7 @@ export async function GET(request: Request) {
 
 /**
  * PATCH /api/settings — updates user's branding settings.
- * Accepts: { brand_color?: string, logo_url?: string, default_template?: string }
+ * Uses Zod schema for input validation (Fail Fast).
  */
 export async function PATCH(request: Request) {
     try {
@@ -52,21 +53,38 @@ export async function PATCH(request: Request) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        const body = await request.json();
-        const updateData: Record<string, string> = {};
-
-        if (body.brand_color && /^#[0-9A-Fa-f]{6}$/.test(body.brand_color)) {
-            updateData.brand_color = body.brand_color;
-        }
-        if (body.logo_url && typeof body.logo_url === "string") {
-            updateData.logo_url = body.logo_url.slice(0, 500); // limit URL length
-        }
-        if (body.default_template && typeof body.default_template === "string") {
-            updateData.default_template = body.default_template;
+        // Parse JSON body — fail fast on malformed JSON
+        let body: unknown;
+        try {
+            body = await request.json();
+        } catch {
+            return NextResponse.json(
+                { error: "Invalid JSON body" },
+                { status: 400 }
+            );
         }
 
+        // Zod validation — fail fast with structured errors
+        const parsed = SettingsPatchSchema.safeParse(body);
+        if (!parsed.success) {
+            const fieldErrors = parsed.error.issues.map((issue) => ({
+                field: issue.path.join('.'),
+                message: issue.message,
+            }));
+            return NextResponse.json(
+                { error: "Validation failed", details: fieldErrors },
+                { status: 400 }
+            );
+        }
+
+        const updateData = parsed.data;
+
+        // Check at least one field is present
         if (Object.keys(updateData).length === 0) {
-            return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
+            return NextResponse.json(
+                { error: "No fields to update" },
+                { status: 400 }
+            );
         }
 
         const sb = getSupabaseAdmin();
