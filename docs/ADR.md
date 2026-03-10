@@ -192,3 +192,27 @@ FSD — фронтенд-методология. Python-бэкенд уже им
 ### Последствия
 *   **Хорошие:** React 19 features (use, Actions), Next.js 15 improvements, актуальные security patches.
 *   **Плохие:** Shared JS +17% (87→102 kB). Допустимо для TMA.
+
+## ADR-010: Zod Validation для API Routes (Fail Fast)
+
+### Контекст
+PATCH /api/settings использовал ad-hoc regex и typeof проверки — молча игнорировал невалидные поля, возвращал 500 на кривой JSON, принимал произвольные строки в `default_template`.
+
+### Решение
+Все мутирующие API роуты валидируют input через Zod-схемы в `lib/schemas/`. Используется `safeParse()` + `strict()`. Ошибки возвращаются как `{ error, details: [{ field, message }] }` с HTTP 400.
+
+### Последствия
+*   **Хорошие:** Fail Fast, структурированные ошибки, SQL injection защита через enum whitelist, 13 тестов.
+*   **Плохие:** Нет.
+
+## ADR-011: Security Hardening — Auth Validation
+
+### Контекст
+`validateInitData()` использовал `!==` для сравнения хэшей (timing attack) и не проверял `auth_date` из будущего (clock skew attack). `/api/history` возвращал `user_id` (PII).
+
+### Решение
+`crypto.timingSafeEqual` для хэш-сравнения. Отклоняем `auth_date > now + 60s`. Убрали `user_id` из response. 12 security тестов.
+
+### Последствия
+*   **Хорошие:** Zero-trust auth, нет PII leak, timing-safe, TDD coverage.
+*   **Плохие:** Нет.
