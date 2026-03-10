@@ -22,9 +22,11 @@ export function validateInitData(
         const hash = params.get("hash");
         if (!hash) return null;
 
-        // Check auth_date freshness (10 min window)
+        // Check auth_date freshness (10 min window, reject future dates > 60s)
         const authDate = parseInt(params.get("auth_date") ?? "0", 10);
-        if (Date.now() / 1000 - authDate > 600) return null;
+        const now = Date.now() / 1000;
+        if (now - authDate > 600) return null;
+        if (authDate - now > 60) return null;
 
         // Build the data-check-string
         params.delete("hash");
@@ -43,7 +45,11 @@ export function validateInitData(
             .update(dataCheckString)
             .digest("hex");
 
-        if (checkHash !== hash) return null;
+        // Timing-safe comparison to prevent timing attacks
+        const hashBuffer = Buffer.from(hash, 'hex');
+        const checkBuffer = Buffer.from(checkHash, 'hex');
+        if (hashBuffer.length !== checkBuffer.length ||
+            !crypto.timingSafeEqual(hashBuffer, checkBuffer)) return null;
 
         // Extract user
         const userStr = params.get("user");

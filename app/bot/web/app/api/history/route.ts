@@ -31,7 +31,7 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: "Database error" }, { status: 500 });
         }
 
-        return NextResponse.json({ briefs: data ?? [], user_id: user.id });
+        return NextResponse.json({ briefs: data ?? [] });
     } catch (err) {
         console.error("History API error:", err);
         return NextResponse.json({ error: "Internal error" }, { status: 500 });
