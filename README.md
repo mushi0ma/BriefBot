@@ -78,14 +78,37 @@ Voice → Whisper Agent → GPT Agent → PDF Generator → User
 ## 🧪 Тесты
 
 ```bash
+# Python (бэкенд)
 pip install -e ".[dev]"
 pytest tests/ -v
+
+# TMA Web (Next.js)
+cd app/bot/web
+npm test -- --run    # 66 тестов
 ```
+
+## 📱 TMA Web App
+
+Telegram Mini App для пользователей — выбор шаблонов, настройки бренда, история брифов.
+
+- **Стек:** Next.js 15 + React 19 + TypeScript + Zod v4
+- **Деплой:** Vercel (авто при push в main)
+- **Архитектура:** Feature-Sliced Design (FSD)
+- **Тесты:** 66 (Vitest + React Testing Library)
+
+Подробнее: [docs/TMA.md](docs/TMA.md)
 
 ## 🔧 Стек
 
 - **Python 3.12** + aiogram 3 + Celery + Redis
+- **Next.js 15** + React 19 + TypeScript (TMA)
+- **Zod v4** (API валидация) + **Vitest** (тесты)
 - **OpenAI** Whisper (STT) + GPT-4o-mini (анализ)
 - **fpdf2** (PDF) + **Supabase** (PostgreSQL)
 - **structlog** (логирование) + **tenacity** (retry)
-- **Docker Compose** (оркестрация)
+- **Docker Compose** (бэкенд) + **Vercel** (фронтенд)
+
+## 📚 Документация
+
+- [ADR — Architecture Decision Records](docs/ADR.md)
+- [TMA Web App](docs/TMA.md)
