@@ -4,7 +4,7 @@ import path from 'path';
 
 export default defineConfig({
   plugins: [react({
-    jsxRuntime: 'classic'
+    jsxRuntime: 'automatic'
   })],
   test: {
     environment: 'jsdom',
