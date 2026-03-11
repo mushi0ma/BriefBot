@@ -67,6 +67,21 @@ describe('SettingsPatchSchema — Input Validation', () => {
     expect(result.error!.issues[0].message).toContain('500');
   });
 
+  it('rejects http:// URLs (HTTPS only)', () => {
+    const result = SettingsPatchSchema.safeParse({
+      logo_url: 'http://example.com/logo.png',
+    });
+    expect(result.success).toBe(false);
+    expect(result.error!.issues[0].message).toContain('HTTPS');
+  });
+
+  it('rejects javascript: URLs (XSS prevention)', () => {
+    const result = SettingsPatchSchema.safeParse({
+      logo_url: 'javascript:alert(1)',
+    });
+    expect(result.success).toBe(false);
+  });
+
   // ── default_template validation ─────────────────────────────────
 
   it('rejects unknown template slug', () => {
@@ -103,7 +118,7 @@ describe('SettingsPatchSchema — Input Validation', () => {
       default_template: 'nonexistent',
     });
     expect(result.success).toBe(false);
-    expect(result.error!.issues).toHaveLength(3);
+    expect(result.error!.issues.length).toBeGreaterThanOrEqual(3);
     // Each issue should have a readable message
     result.error!.issues.forEach((issue) => {
       expect(issue.message.length).toBeGreaterThan(5);

@@ -15,6 +15,9 @@ export const SettingsPatchSchema = z.object({
     .string()
     .url('Must be a valid URL')
     .max(500, 'URL must be under 500 characters')
+    .refine((url) => url.startsWith('https://'), {
+      message: 'Only HTTPS URLs are allowed',
+    })
     .optional(),
   default_template: z
     .enum(VALID_TEMPLATES)
