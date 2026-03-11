@@ -146,7 +146,7 @@ async def cmd_health(message: Message) -> None:
         return
 
     settings = get_settings()
-    checks = []
+    checks: list[str] = []
 
     # Redis check
     try:
