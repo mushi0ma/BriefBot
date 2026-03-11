@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, Mock } from 'vitest';
 import { POST } from "../route";
 import * as auth from "@/lib/auth";
 import * as supabase from "@/lib/supabase";
@@ -9,7 +9,7 @@ vi.mock("@/lib/supabase");
 
 describe("POST /api/history/download-bulk", () => {
     let mockReq: Request;
-    let mockSupabase: any;
+    let mockSupabase: Record<string, Mock>;
 
     beforeEach(() => {
         vi.clearAllMocks();
@@ -22,7 +22,7 @@ describe("POST /api/history/download-bulk", () => {
             not: vi.fn().mockReturnThis(),
             update: vi.fn().mockReturnThis()
         };
-        (supabase.getSupabaseAdmin as any).mockReturnValue(mockSupabase);
+        (supabase.getSupabaseAdmin as Mock).mockReturnValue(mockSupabase);
 
         mockReq = {
             headers: new Headers({ Authorization: "test-auth-data" }),
@@ -31,7 +31,7 @@ describe("POST /api/history/download-bulk", () => {
     });
 
     it("should return 401 if unauthorized", async () => {
-        (auth.validateInitData as any).mockReturnValue(null);
+        (auth.validateInitData as Mock).mockReturnValue(null);
         
         const res = await POST(mockReq);
         const data = await res.json();
@@ -41,7 +41,7 @@ describe("POST /api/history/download-bulk", () => {
     });
 
     it("should return 400 if invalid payload", async () => {
-        (auth.validateInitData as any).mockReturnValue({ id: 12345 });
+        (auth.validateInitData as Mock).mockReturnValue({ id: 12345 });
         mockReq.json = vi.fn().mockResolvedValue({ record_ids: "not-an-array" });
 
         const res = await POST(mockReq);
@@ -52,7 +52,7 @@ describe("POST /api/history/download-bulk", () => {
     });
 
     it("should return empty array if no record_ids given", async () => {
-        (auth.validateInitData as any).mockReturnValue({ id: 12345 });
+        (auth.validateInitData as Mock).mockReturnValue({ id: 12345 });
         mockReq.json = vi.fn().mockResolvedValue({ record_ids: [] });
 
         const res = await POST(mockReq);
@@ -63,7 +63,7 @@ describe("POST /api/history/download-bulk", () => {
     });
 
     it("should retrieve valid URLs and mark them as downloaded", async () => {
-        (auth.validateInitData as any).mockReturnValue({ id: 12345 });
+        (auth.validateInitData as Mock).mockReturnValue({ id: 12345 });
         
         // Mock fetch response chain
         mockSupabase.not.mockResolvedValueOnce({
@@ -93,7 +93,7 @@ describe("POST /api/history/download-bulk", () => {
     });
 
     it("should return 500 on database error", async () => {
-        (auth.validateInitData as any).mockReturnValue({ id: 12345 });
+        (auth.validateInitData as Mock).mockReturnValue({ id: 12345 });
         mockSupabase.not.mockResolvedValueOnce({ data: null, error: { message: "DB Error" } });
 
         const res = await POST(mockReq);
