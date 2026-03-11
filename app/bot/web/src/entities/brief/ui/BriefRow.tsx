@@ -16,8 +16,13 @@ export function BriefRow({ brief, isLast }: { brief: Brief; isLast: boolean }) {
             <FileText className="w-5 h-5" />
           </div>
           <div className="min-w-0">
-            <p className="text-[15px] font-normal truncate">
-              {brief.template_slug.charAt(0).toUpperCase() + brief.template_slug.slice(1)}
+            <p className="text-[15px] font-normal truncate flex items-center gap-1.5">
+              <span>{brief.template_slug.charAt(0).toUpperCase() + brief.template_slug.slice(1)}</span>
+              {brief.is_downloaded && (
+                <span className="bg-green-500/10 text-green-600 text-[10px] uppercase font-bold px-1.5 py-0.5 rounded-md">
+                  Сохранен
+                </span>
+              )}
             </p>
             <p className="text-[13px] text-[var(--tg-theme-hint-color,#98989e)]">
               {formatDate(brief.created_at)}

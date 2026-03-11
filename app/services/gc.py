@@ -4,9 +4,7 @@ Garbage Collector service for cleaning up temporary files.
 
 from __future__ import annotations
 
-import os
 import time
-from pathlib import Path
 
 from app.config import get_settings
 from app.logger import get_logger

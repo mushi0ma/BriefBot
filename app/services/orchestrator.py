@@ -6,10 +6,8 @@ v7: All repo/storage calls are now async (asyncio.to_thread).
 
 from __future__ import annotations
 
-import os
 import time
 from pathlib import Path
-from typing import Any
 
 from app.db.history_repo import HistoryRepo
 from app.db.template_repo import get_template
@@ -19,7 +17,7 @@ from app.models.brief import BriefData, BriefTemplate, ProcessingResult, Process
 from app.services.ai_factory import get_ai_agent
 from app.services.analysis import RateLimitError
 from app.services.cache import get_cache
-from app.services.notification import notify_admin
+from app.services.notification import notify_admin, notify_admin_new_brief
 from app.services.pdf_generator import generate_pdf
 from app.db.supabase_client import upload_file
 
@@ -53,6 +51,7 @@ class OrchestratorAgent:
         template_slug: str = "default",
         username: str | None = None,
         file_id: str | None = None,
+        cleanup_pdf: bool = False,
     ) -> ProcessingResult:
         """
         Runs the full audio processing pipeline.
@@ -118,6 +117,14 @@ class OrchestratorAgent:
             )
             await UserRepo.increment_briefs(telegram_id)
 
+            # Notify admin of the robustly generated PDF
+            await notify_admin_new_brief(
+                pdf_url=pdf_url or pdf_path,
+                brief_data=brief_data,
+                user_info=f"@{username}" if username else str(telegram_id),
+                template_slug=template_slug
+            )
+
             logger.info("pipeline_completed", user_id=telegram_id, duration=elapsed_ms)
 
             return ProcessingResult(
@@ -168,8 +175,113 @@ class OrchestratorAgent:
             # Cleanup: delete the downloaded audio file
             self._cleanup_file(audio_path)
             # Cleanup: delete the local PDF after sending
-            if pdf_path:
+            if cleanup_pdf and pdf_path:
                 self._cleanup_file(pdf_path)
+
+    async def process_audio_to_draft(
+        self,
+        chat_id: int,
+        telegram_id: int,
+        audio_path: str,
+        template_slug: str = "default",
+        username: str | None = None,
+        file_id: str | None = None,
+    ) -> ProcessingResult:
+        """
+        Runs the audio processing pipeline up to the "ANALYZING" phase
+        and returns the isolated JSON data as a interactive draft.
+        """
+        start_time = time.monotonic()
+        history_id: str | None = None
+
+        try:
+            # 0. User & Template prep
+            user = await UserRepo.get_or_create(telegram_id, username or "")
+            template = get_template(template_slug)
+
+            # Create initial history record
+            history = await HistoryRepo.create(
+                user_id=user["id"],
+                telegram_id=telegram_id,
+                template_slug=template_slug,
+                original_text="Processing..."
+            )
+            history_id = history["id"]
+
+            # 1. Check Cache (use file_id if available, else audio_path)
+            cache_key = file_id or audio_path
+            cached_result = await self.cache.get(cache_key, template_slug)
+            if cached_result:
+                logger.info("pipeline_draft_cache_hit", user_id=telegram_id)
+                brief_data = cached_result
+            else:
+                # 2. AI Processing (Multimodal)
+                logger.info("pipeline_draft_started", user_id=telegram_id, provider=type(self.ai).__name__)
+                await self._update_history(history_id, ProcessingState.ANALYZING)
+
+                brief_data = await self.ai.process_audio(audio_path, template)
+
+                # Update Cache
+                await self.cache.set(cache_key, template_slug, brief_data)
+
+            # 3. Final Logs & Stats (Mark as DONE for the extraction phase)
+            elapsed_ms = int((time.monotonic() - start_time) * 1000)
+
+            await HistoryRepo.update(
+                history_id,
+                processing_state=ProcessingState.DONE.value,
+                original_text=brief_data.original_text,
+                brief_data=brief_data.model_dump(),
+                processing_time_ms=elapsed_ms,
+            )
+
+            logger.info("pipeline_draft_completed", user_id=telegram_id, duration=elapsed_ms)
+
+            return ProcessingResult(
+                state=ProcessingState.DONE,
+                brief_data=brief_data,
+                processing_time_ms=elapsed_ms,
+            )
+
+        except RateLimitError:
+            elapsed_ms = int((time.monotonic() - start_time) * 1000)
+            logger.warning("pipeline_draft_rate_limited", user_id=telegram_id)
+            if history_id:
+                await HistoryRepo.update(
+                    history_id,
+                    processing_state=ProcessingState.FAILED.value,
+                    error_message=RATE_LIMIT_MSG,
+                    processing_time_ms=elapsed_ms,
+                )
+            return ProcessingResult(
+                state=ProcessingState.FAILED,
+                error_message=RATE_LIMIT_MSG,
+                processing_time_ms=elapsed_ms,
+            )
+
+        except Exception as e:
+            elapsed_ms = int((time.monotonic() - start_time) * 1000)
+            logger.error("pipeline_draft_failed", error=str(e), user_id=telegram_id)
+
+            if history_id:
+                await HistoryRepo.update(
+                    history_id,
+                    processing_state=ProcessingState.FAILED.value,
+                    error_message=str(e),
+                    processing_time_ms=elapsed_ms,
+                )
+
+            await notify_admin(f"Draft failure for user {telegram_id}: {str(e)}")
+
+            return ProcessingResult(
+                state=ProcessingState.FAILED,
+                error_message="Произошла ошибка при обработке. Попробуйте позже или обратитесь к администратору.",
+                processing_time_ms=elapsed_ms,
+            )
+
+        finally:
+            # Cleanup: delete the downloaded audio file
+            self._cleanup_file(audio_path)
 
     async def process_text(
         self,
@@ -178,6 +290,7 @@ class OrchestratorAgent:
         text: str,
         template_slug: str = "default",
         username: str | None = None,
+        cleanup_pdf: bool = False,
     ) -> ProcessingResult:
         """
         Runs the text-only processing pipeline (skips STT).
@@ -234,6 +347,14 @@ class OrchestratorAgent:
             )
             await UserRepo.increment_briefs(telegram_id)
 
+            # Notify admin of the robustly generated PDF
+            await notify_admin_new_brief(
+                pdf_url=pdf_url or pdf_path,
+                brief_data=brief_data,
+                user_info=f"@{username}" if username else str(telegram_id),
+                template_slug=template_slug
+            )
+
             logger.info("pipeline_text_completed", user_id=telegram_id, duration=elapsed_ms)
 
             return ProcessingResult(
@@ -280,7 +401,7 @@ class OrchestratorAgent:
             )
 
         finally:
-            if pdf_path:
+            if cleanup_pdf and pdf_path:
                 self._cleanup_file(pdf_path)
 
     async def process_with_brief_data(
@@ -293,6 +414,7 @@ class OrchestratorAgent:
         username: str | None = None,
         brand_color: str | None = None,
         logo_url: str | None = None,
+        cleanup_pdf: bool = False,
     ) -> ProcessingResult:
         """
         Runs only the PDF generation step using pre-computed BriefData.
@@ -347,6 +469,14 @@ class OrchestratorAgent:
             )
             await UserRepo.increment_briefs(telegram_id)
 
+            # Notify admin of the robustly generated PDF
+            await notify_admin_new_brief(
+                pdf_url=pdf_url or pdf_path,
+                brief_data=brief_data,
+                user_info=f"@{username}" if username else str(telegram_id),
+                template_slug=template_slug
+            )
+
             logger.info("pipeline_draft_completed", user_id=telegram_id, duration=elapsed_ms)
 
             return ProcessingResult(
@@ -377,7 +507,7 @@ class OrchestratorAgent:
             )
 
         finally:
-            if pdf_path:
+            if cleanup_pdf and pdf_path:
                 self._cleanup_file(pdf_path)
 
     @staticmethod

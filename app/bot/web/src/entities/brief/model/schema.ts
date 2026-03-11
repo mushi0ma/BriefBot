@@ -8,6 +8,9 @@ export const BriefSchema = z.object({
   pdf_url: z.string().nullable(),
   processing_time_ms: z.number().nullable(),
   created_at: z.string(),
+  title: z.string().nullable().optional(),
+  keywords: z.array(z.string()).nullable().optional(),
+  is_downloaded: z.boolean().nullable().optional(),
 });
 
 export type Brief = z.infer<typeof BriefSchema>;

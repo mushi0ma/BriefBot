@@ -9,7 +9,6 @@ v2: Adds SPA-style menu (Feature 3), interactive history pagination (Feature 1),
 from __future__ import annotations
 
 import math
-import os
 from pathlib import Path
 
 from aiogram import Bot, Dispatcher, Router, F
@@ -28,8 +27,6 @@ from app.bot.keyboards import (
     draft_review_keyboard,
     feedback_keyboard,
     generate_brief_keyboard,
-    history_item_keyboard,
-    history_page_keyboard,
     main_menu_keyboard,
     missing_info_keyboard,
     settings_keyboard,
@@ -43,7 +40,7 @@ from app.db.user_repo import UserRepo
 from app.logger import get_logger
 from app.models.brief import ProcessingState
 from app.services.orchestrator import OrchestratorAgent
-from app.worker.tasks import process_voice_message
+from app.worker.tasks import task_analyze_request
 
 logger = get_logger("main_bot")
 
@@ -279,7 +276,6 @@ async def _show_history_page(
         created = item.get("created_at", "")[:16].replace("T", " ")
         template = item.get("template_slug", "default")
         time_ms = item.get("processing_time_ms", 0)
-        history_id = item.get("id", "")
         summary = ""
         bd = item.get("brief_data", {})
         if bd and isinstance(bd, dict):
@@ -368,7 +364,7 @@ async def handle_voice(message: Message, bot: Bot, state: FSMContext) -> None:
         return
 
     # Dispatch Celery task
-    task = process_voice_message.delay(
+    task = task_analyze_request.delay(
         chat_id=chat_id,
         telegram_id=user_id,
         audio_path=audio_path,
@@ -379,10 +375,10 @@ async def handle_voice(message: Message, bot: Bot, state: FSMContext) -> None:
 
     # Send "processing" status with cancel button (Feature 6)
     await message.answer(
-        "⏳ *Обрабатываю ваше сообщение...*\n\n"
+        "🎙 *Аудио получено...*\n\n"
         f"Шаблон: {template_slug}\n"
-        "▪️▪️▪️▪️▪️ Расшифровка...\n\n"
-        "Это займёт ~15 секунд.",
+        "Передаю в обработку ИИ.\n\n"
+        "Ожидайте создания черновика.",
         parse_mode="Markdown",
         reply_markup=cancel_task_keyboard(task.id),
     )
@@ -419,7 +415,6 @@ async def handle_draft_edit(message: Message, state: FSMContext, bot: Bot) -> No
         return
 
     user_id = message.from_user.id if message.from_user else 0
-    chat_id = message.chat.id
     template_slug = _user_templates.get(user_id, "default")
 
     data = await state.get_data()
@@ -552,7 +547,6 @@ async def handle_text(message: Message, state: FSMContext) -> None:
         return
 
     user_id = message.from_user.id if message.from_user else 0
-    current_state = await state.get_state()
 
     # Get or initialize the text buffer
     data = await state.get_data()

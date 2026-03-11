@@ -6,8 +6,7 @@ Updated for WeasyPrint-based generation.
 from __future__ import annotations
 
 import os
-from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import pytest
 
@@ -40,11 +39,14 @@ def sample_template() -> BriefTemplate:
 def sample_brief_data() -> BriefData:
     """Create test brief data."""
     return BriefData(
+        title="Бот для заказов",
+        keywords=["бот", "telegram", "заказы"],
         service_type="Разработка Telegram бота",
         deadline="2 недели",
         budget="100 000 руб.",
         wishes="1. Интеграция с CRM\n2. Админ-панель\n3. Аналитика",
-        missing_info="1. Какую CRM используете?\n2. Нужна ли оплата в боте?",
+        missing_fields=["Какую CRM используете?", "Нужна ли оплата в боте?"],
+        missing_info="",
         summary="Клиент хочет Telegram-бота для автоматизации заказов с интеграцией CRM.",
         original_text="Ну короче мне нужен бот в телеграме, чтобы клиенты могли заказывать товары...",
     )
@@ -81,6 +83,9 @@ class TestPDFGenerator:
     def test_generate_pdf_with_empty_data(self, mock_settings, sample_template):
         """Test PDF generation with mostly empty brief data."""
         empty_data = BriefData(
+            title="",
+            keywords=[],
+            missing_fields=[],
             service_type="",
             deadline="",
             budget="",
@@ -123,6 +128,9 @@ class TestBriefDataModel:
     def test_default_values(self):
         """Test that all fields have sensible defaults."""
         data = BriefData()
+        assert data.title == ""
+        assert data.keywords == []
+        assert data.missing_fields == []
         assert data.service_type == ""
         assert data.deadline == ""
         assert data.budget == ""
@@ -136,8 +144,11 @@ class TestBriefDataModel:
     def test_model_dump(self, sample_brief_data):
         """Test Pydantic model serialization."""
         dumped = sample_brief_data.model_dump()
+        assert dumped["title"] == "Бот для заказов"
+        assert dumped["keywords"] == ["бот", "telegram", "заказы"]
         assert dumped["service_type"] == "Разработка Telegram бота"
         assert dumped["budget"] == "100 000 руб."
+        assert dumped["missing_fields"] == ["Какую CRM используете?", "Нужна ли оплата в боте?"]
         assert "extra_sections" in dumped
         assert "client_assessment" in dumped
 

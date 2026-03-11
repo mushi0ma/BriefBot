@@ -5,11 +5,10 @@ Tests for the GPT analysis service.
 from __future__ import annotations
 
 import json
-from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.models.brief import BriefData, BriefTemplate, TemplateSection, TemplateStyle
+from app.models.brief import BriefData, BriefTemplate, TemplateSection
 from app.services.analysis import GPTAgent, AnalysisError, _build_system_prompt
 
 
@@ -31,11 +30,14 @@ def sample_template() -> BriefTemplate:
 @pytest.fixture
 def valid_gpt_response() -> str:
     return json.dumps({
+        "title": "Сайт-визитка",
+        "keywords": ["сайт", "визитка", "web"],
         "service_type": "Разработка сайта",
         "deadline": "1 месяц",
         "budget": "200 000 руб.",
         "wishes": "Адаптивный дизайн",
-        "missing_info": "Нужен ли хостинг?",
+        "missing_fields": ["Нужен ли хостинг?"],
+        "missing_info": "",
         "summary": "Клиент хочет сайт-визитку.",
     })
 
@@ -79,14 +81,20 @@ class TestGPTAgent:
         """Valid JSON should parse into BriefData."""
         result = GPTAgent._parse_response(valid_gpt_response, "original text")
         assert isinstance(result, BriefData)
+        assert result.title == "Сайт-визитка"
+        assert result.keywords == ["сайт", "визитка", "web"]
         assert result.service_type == "Разработка сайта"
         assert result.budget == "200 000 руб."
+        assert result.missing_fields == ["Нужен ли хостинг?"]
         assert result.original_text == "original text"
 
     def test_parse_missing_fields(self):
         """Missing fields should default to empty strings."""
         minimal_json = json.dumps({"service_type": "Test"})
         result = GPTAgent._parse_response(minimal_json, "text")
+        assert result.title == ""
+        assert result.keywords == []
+        assert result.missing_fields == []
         assert result.service_type == "Test"
         assert result.deadline == ""
         assert result.budget == ""

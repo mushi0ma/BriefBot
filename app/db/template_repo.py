@@ -14,7 +14,6 @@ from typing import Any
 
 from tenacity import retry, stop_after_attempt, wait_exponential, before_sleep_log
 
-from app.config import get_settings
 from app.db.supabase_client import get_supabase
 from app.logger import get_logger
 from app.models.brief import BriefTemplate

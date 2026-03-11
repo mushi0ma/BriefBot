@@ -5,7 +5,6 @@ v2: Adds history pagination, main menu, cancel task, missing info, and settings 
 
 from __future__ import annotations
 
-import math
 
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from aiogram.utils.keyboard import InlineKeyboardBuilder

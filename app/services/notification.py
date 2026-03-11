@@ -13,6 +13,7 @@ import httpx
 
 from app.config import get_settings
 from app.logger import get_logger
+from app.models.brief import BriefData
 
 logger = get_logger("notification")
 
@@ -82,3 +83,40 @@ async def notify_admin(
     except Exception as e:
         # Never crash because of notification failure
         logger.error("admin_notify_failed", error=str(e), original_message=message[:200])
+
+
+async def notify_admin_new_brief(pdf_url: str, brief_data: BriefData, user_info: str, template_slug: str) -> None:
+    """Send a lightweight Markdown notification about a newly generated brief."""
+    settings = get_settings()
+    
+    parts = [
+        "📄 *Новый бриф сгенерирован!*",
+        "",
+        f"👤 *Пользователь:* {user_info}",
+        f"📋 *Шаблон:* {template_slug}",
+        f"📌 *Тип услуги:* {brief_data.service_type or 'Не указан'}",
+        f"💰 *Бюджет:* {brief_data.budget or 'Не указан'}",
+        f"⏳ *Сроки:* {brief_data.deadline or 'Не указан'}",
+        "",
+        f"🔗 [Скачать PDF из хранилища]({pdf_url})"
+    ]
+    
+    text = "\n".join(parts)
+    
+    try:
+        url = f"https://api.telegram.org/bot{settings.telegram_admin_bot_token.get_secret_value()}/sendMessage"
+        payload = {
+            "chat_id": settings.admin_chat_id,
+            "text": text,
+            "parse_mode": "Markdown",
+            "disable_web_page_preview": True,
+        }
+
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.post(url, json=payload)
+            if response.status_code != 200:
+                logger.error("admin_notify_new_brief_http_error", status=response.status_code, body=response.text)
+            else:
+                logger.info("admin_notified_new_brief", user_info=user_info)
+    except Exception as e:
+        logger.error("admin_notify_new_brief_failed", error=str(e), user_info=user_info)

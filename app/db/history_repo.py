@@ -216,3 +216,31 @@ class HistoryRepo:
             }
 
         return await asyncio.to_thread(_inner)
+
+    @staticmethod
+    async def search_briefs(keyword: str, telegram_id: int | None = None, limit: int = 20) -> list[dict[str, Any]]:
+        """Search brief history by keyword."""
+
+        @_retry
+        def _inner() -> list[dict[str, Any]]:
+            sb = get_supabase()
+            query = sb.table(HistoryRepo.TABLE).select("*").contains("keywords", [keyword])
+            if telegram_id is not None:
+                query = query.eq("telegram_id", telegram_id)
+            result = query.order("created_at", desc=True).limit(limit).execute()
+            return result.data or []
+
+        return await asyncio.to_thread(_inner)
+
+    @staticmethod
+    async def mark_as_downloaded(record_ids: list[str]) -> None:
+        """Mark specific history records as downloaded."""
+        if not record_ids:
+            return
+
+        @_retry
+        def _inner() -> None:
+            sb = get_supabase()
+            sb.table(HistoryRepo.TABLE).update({"is_downloaded": True}).in_("id", record_ids).execute()
+
+        await asyncio.to_thread(_inner)

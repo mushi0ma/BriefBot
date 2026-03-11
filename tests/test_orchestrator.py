@@ -5,12 +5,11 @@ Updated for v4 with process_text support.
 
 from __future__ import annotations
 
-import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.models.brief import BriefData, ProcessingResult, ProcessingState
+from app.models.brief import BriefData, ProcessingState
 from app.services.orchestrator import OrchestratorAgent
 
 

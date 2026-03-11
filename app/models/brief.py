@@ -33,6 +33,9 @@ class BriefSection(BaseModel):
 class BriefData(BaseModel):
     """Structured data extracted from the voice message by GPT agent."""
 
+    title: str = Field(default="", description="Short informative title of the brief")
+    keywords: list[str] = Field(default_factory=list, description="Keywords for search")
+    missing_fields: list[str] = Field(default_factory=list, description="Fields that were missing from the prompt")
     service_type: str = Field(default="", description="Type of service requested")
     deadline: str = Field(default="", description="Project deadline")
     budget: str = Field(default="", description="Budget range or exact amount")

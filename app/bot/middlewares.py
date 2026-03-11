@@ -89,7 +89,7 @@ class ErrorHandlerMiddleware(BaseMiddleware):
             # Notify admin
             try:
                 await notify_admin(
-                    message=f"Bot handler error",
+                    message="Bot handler error",
                     severity=Severity.WARNING,
                     error=e,
                     context={"user_id": user_id, "chat_id": chat_id},

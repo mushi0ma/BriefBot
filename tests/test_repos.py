@@ -162,6 +162,63 @@ class TestHistoryRepoRetry:
         assert mock_insert.execute.call_count == 3
 
 
+    @pytest.mark.asyncio
+    @patch("app.db.history_repo.get_supabase")
+    async def test_search_briefs(self, mock_get_sb):
+        """Test search_briefs executes with the correct query parameters."""
+        mock_sb = MagicMock()
+        mock_get_sb.return_value = mock_sb
+
+        mock_table = MagicMock()
+        mock_sb.table.return_value = mock_table
+        mock_select = MagicMock()
+        mock_table.select.return_value = mock_select
+        
+        mock_contains = MagicMock()
+        mock_select.contains.return_value = mock_contains
+        mock_order = MagicMock()
+        mock_contains.order.return_value = mock_order
+        mock_limit = MagicMock()
+        mock_order.limit.return_value = mock_limit
+
+        def execute_side_effect():
+            result = MagicMock()
+            result.data = [{"id": "hist-1", "title": "Test"}]
+            return result
+
+        mock_limit.execute.side_effect = execute_side_effect
+
+        from app.db.history_repo import HistoryRepo
+        results = await HistoryRepo.search_briefs(keyword="test")
+
+        assert len(results) == 1
+        assert results[0]["id"] == "hist-1"
+        mock_select.contains.assert_called_with("keywords", ["test"])
+
+
+    @pytest.mark.asyncio
+    @patch("app.db.history_repo.get_supabase")
+    async def test_mark_as_downloaded(self, mock_get_sb):
+        """Test mark_as_downloaded updates the is_downloaded flag."""
+        mock_sb = MagicMock()
+        mock_get_sb.return_value = mock_sb
+
+        mock_table = MagicMock()
+        mock_sb.table.return_value = mock_table
+        mock_update = MagicMock()
+        mock_table.update.return_value = mock_update
+        mock_in_ = MagicMock()
+        mock_update.in_.return_value = mock_in_
+
+        mock_in_.execute.return_value = MagicMock()
+
+        from app.db.history_repo import HistoryRepo
+        await HistoryRepo.mark_as_downloaded(["hist-1", "hist-2"])
+
+        mock_table.update.assert_called_with({"is_downloaded": True})
+        mock_update.in_.assert_called_with("id", ["hist-1", "hist-2"])
+
+
 # ---------------------------------------------------------------------------
 # TemplateDBRepo
 # ---------------------------------------------------------------------------

@@ -182,14 +182,17 @@ class OpenRouterAgent:
 
 ОБЯЗАТЕЛЬНЫЕ КЛЮЧИ JSON:
 {sections_str}
+- title: короткое информативное название проекта (2-4 слова)
+- keywords: массив строк (3-5 ключевых слов для поиска)
 - summary: краткое резюме запроса в 1-2 предложениях
 - original_text: исходный текст клиента (на русском)
 - client_assessment: профессиональная оценка для фрилансера — тон клиента, чёткость запроса, красные флаги
+- missing_fields: массив строк, содержащий названия полей из шаблона, для которых клиент не предоставил информацию.
 
 ПРАВИЛА:
 1. Выводи ТОЛЬКО валидный JSON-объект.
 2. Используй точно указанные ключи.
-3. Для отсутствующей информации — пустая строка. Не выдумывай данных.
+3. Для отсутствующей информации — пустая строка для текстовых полей, а название обязательного поля добавь в массив "missing_fields". Не выдумывай данных.
 4. Для списков используй Markdown:
    - "- элемент" для маркированных списков
    - "1. элемент" для нумерованных
@@ -220,6 +223,9 @@ class OpenRouterAgent:
             cleaned = _extract_json(raw_json)
             data = json.loads(cleaned)
             return BriefData(
+                title=data.get("title", ""),
+                keywords=data.get("keywords", []),
+                missing_fields=data.get("missing_fields", []),
                 service_type=data.get("service_type", ""),
                 deadline=data.get("deadline", ""),
                 budget=data.get("budget", ""),

@@ -18,7 +18,7 @@ import httpx
 import redis
 from aiogram import Bot, Dispatcher, Router, F
 from aiogram.filters import Command, CommandStart
-from aiogram.types import Message, CallbackQuery, FSInputFile
+from aiogram.types import Message, CallbackQuery, FSInputFile, ReplyKeyboardMarkup, KeyboardButton
 
 from app.config import get_settings
 from app.db.history_repo import HistoryRepo
@@ -30,6 +30,7 @@ from app.db.template_repo import (
 from app.db.user_repo import UserRepo
 from app.logger import get_logger
 from app.models.brief import BriefTemplate
+from app.services.export import create_export_zip
 
 logger = get_logger("admin_bot")
 
@@ -43,6 +44,19 @@ def _is_admin(message: Message) -> bool:
     """Check if the sender is the authorized admin."""
     settings = get_settings()
     return message.from_user and message.from_user.id == settings.admin_chat_id
+
+
+def admin_main_keyboard() -> ReplyKeyboardMarkup:
+    """Persistent reply keyboard with common admin actions."""
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [
+                KeyboardButton(text="📊 Статистика"),
+                KeyboardButton(text="🌐 TMA Дашборд"),
+            ]
+        ],
+        resize_keyboard=True,
+    )
 
 
 # ── /start ───────────────────────────────────────────────────────────────────
@@ -65,11 +79,13 @@ async def cmd_start(message: Message) -> None:
         "/dashboard — веб-панель администратора\n\n"
         "📎 Отправьте JSON-файл шаблона для добавления.",
         parse_mode="Markdown",
+        reply_markup=admin_main_keyboard(),
     )
 
 
 # ── /dashboard ───────────────────────────────────────────────────────────────
 @router.message(Command("dashboard"))
+@router.message(F.text == "🌐 TMA Дашборд")
 async def cmd_dashboard(message: Message) -> None:
     """Open the admin dashboard Mini App."""
     if not _is_admin(message):
@@ -97,6 +113,7 @@ async def cmd_dashboard(message: Message) -> None:
 
 # ── /stats ───────────────────────────────────────────────────────────────────
 @router.message(Command("stats"))
+@router.message(F.text == "📊 Статистика")
 async def cmd_stats(message: Message) -> None:
     """Show aggregated statistics."""
     if not _is_admin(message):
@@ -279,6 +296,53 @@ async def cmd_export(message: Message) -> None:
         logger.error("export_error", error=str(e), exc_info=True)
         await message.answer(f"❌ Ошибка экспорта: {e}")
 
+
+# ── /download_keyword ────────────────────────────────────────────────────────
+@router.message(Command("download_keyword"))
+async def cmd_mass_download_keyword(message: Message) -> None:
+    """Mass download briefs matching a specific keyword/tag into a zip archive."""
+    if not _is_admin(message):
+        return
+
+    text = message.text or ""
+    parts = text.split(None, 1)
+    if len(parts) < 2:
+        await message.answer(
+            "📦 *Массовое скачивание*\n\n"
+            "Укажите тег для поиска после команды.\n"
+            "Пример: `/download_keyword design`",
+            parse_mode="Markdown"
+        )
+        return
+
+    keyword = parts[1].strip()
+    await message.answer(f"🔍 Ищу отчеты по тегу: *{keyword}*...", parse_mode="Markdown")
+
+    try:
+        results = await HistoryRepo.search_briefs(keyword=keyword)
+        if not results:
+            await message.answer(f"📭 Не найдено отчетов по тегу: *{keyword}*", parse_mode="Markdown")
+            return
+
+        await message.answer(f"⏳ Найдено отчетов: *{len(results)}*. Формирую ZIP архив...", parse_mode="Markdown")
+        
+        zip_buffer = await create_export_zip(results)
+        if not zip_buffer:
+            await message.answer("❌ Ошибка при формировании ZIP архива.")
+            return
+        # We need to workaround FSInputFile requiring a valid Path by passing the bytes via BufferedInputFile 
+        from aiogram.types import BufferedInputFile
+        doc_bytes = BufferedInputFile(zip_buffer.read(), filename=f"export_{keyword}.zip")
+        
+        await message.answer_document(doc_bytes, caption=f"📦 Скачанные отчеты по тегу: *{keyword}*")
+
+        # Mark as downloaded
+        record_ids = [r["id"] for r in results if r.get("id")]
+        await HistoryRepo.mark_as_downloaded(record_ids)
+
+    except Exception as e:
+        logger.error("mass_download_error", error=str(e), exc_info=True)
+        await message.answer(f"❌ Ошибка массового скачивания: {e}")
 
 def _build_csv(data: list[dict], fieldnames: list[str], filename: str) -> str | None:
     """Build a CSV file from a list of dicts and return the temp file path."""

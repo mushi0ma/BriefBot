@@ -21,7 +21,7 @@ export async function GET(request: Request) {
         const sb = getSupabaseAdmin();
         const { data, error } = await sb
             .from("brief_history")
-            .select("id, template_slug, processing_state, brief_data, pdf_url, processing_time_ms, created_at")
+            .select("id, template_slug, processing_state, brief_data, pdf_url, processing_time_ms, created_at, title, is_downloaded")
             .eq("telegram_id", user.id)
             .order("created_at", { ascending: false })
             .limit(50);

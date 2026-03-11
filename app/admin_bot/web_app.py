@@ -5,8 +5,6 @@ Provides stats, health checks, and live log streaming via WebSocket.
 
 from __future__ import annotations
 
-import asyncio
-import json
 import time
 from datetime import datetime, timezone
 

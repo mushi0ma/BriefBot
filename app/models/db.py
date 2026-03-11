@@ -35,11 +35,15 @@ CREATE TABLE IF NOT EXISTS brief_history (
     processing_state  TEXT DEFAULT 'received',
     processing_time_ms INTEGER DEFAULT 0,
     error_message     TEXT DEFAULT '',
+    title             VARCHAR(255) DEFAULT '',
+    keywords          JSONB DEFAULT '[]'::jsonb,
+    is_downloaded     BOOLEAN DEFAULT false,
     created_at        TIMESTAMPTZ DEFAULT now()
 );
 
 CREATE INDEX IF NOT EXISTS idx_history_user ON brief_history (user_id);
 CREATE INDEX IF NOT EXISTS idx_history_created ON brief_history (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_history_keywords ON brief_history USING GIN (keywords);
 
 -- ── Templates ────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS templates (

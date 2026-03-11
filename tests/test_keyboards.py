@@ -4,10 +4,7 @@ Tests for history pagination and keyboards.
 
 from __future__ import annotations
 
-import math
-from unittest.mock import patch, MagicMock
 
-import pytest
 
 from app.bot.keyboards import (
     history_page_keyboard,

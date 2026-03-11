@@ -7,13 +7,10 @@ from __future__ import annotations
 
 import json
 import re
-import tempfile
 from pathlib import Path
-from unittest.mock import patch
 
-import pytest
 
-from app.models.brief import BriefTemplate, TemplateSection
+from app.models.brief import BriefTemplate
 
 # Regex to detect common emoji ranges
 EMOJI_PATTERN = re.compile(

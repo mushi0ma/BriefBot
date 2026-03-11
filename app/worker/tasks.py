@@ -6,19 +6,21 @@ Handles async processing and sending results back to users.
 from __future__ import annotations
 
 import asyncio
-import os
-from pathlib import Path
 
 from aiogram import Bot
 from aiogram.types import FSInputFile
+from aiogram.fsm.storage.redis import RedisStorage
+from aiogram.fsm.storage.base import StorageKey
+
+from app.bot.states import BriefState
 
 from app.config import get_settings
 from app.logger import get_logger
 from app.worker.celery_app import celery_app as celery
 from app.services.orchestrator import OrchestratorAgent
 from app.services.gc import GarbageCollector
-from app.models.brief import ProcessingState, ProcessingResult
-from app.bot.keyboards import feedback_keyboard
+from app.models.brief import ProcessingState, ProcessingResult, BriefData
+from app.bot.keyboards import feedback_keyboard, draft_review_keyboard, missing_info_keyboard
 
 logger = get_logger("worker")
 
@@ -61,27 +63,115 @@ async def _send_result_to_user(chat_id: int, result: ProcessingResult):
         await bot.session.close()
 
 
+def _build_draft_text(brief_data: BriefData) -> str:
+    """Build a formatted draft summary text for user review."""
+    parts = ["*Черновик брифа:*\n"]
+
+    if brief_data.summary:
+        parts.append(f"*Резюме:* {brief_data.summary}\n")
+    if brief_data.service_type:
+        parts.append(f"*Тип услуги:* {brief_data.service_type}")
+    if brief_data.deadline:
+        parts.append(f"*Сроки:* {brief_data.deadline}")
+    if brief_data.budget:
+        parts.append(f"*Бюджет:* {brief_data.budget}")
+    if brief_data.wishes:
+        parts.append(f"*Пожелания:* {brief_data.wishes}")
+
+    if brief_data.missing_info:
+        parts.append(
+            f"\n⚠️ *Нехватающая информация:*\n{brief_data.missing_info}\n"
+            "_Напишите уточнения или нажмите «Сгенерировать PDF»._"
+        )
+
+    parts.append("\nПроверьте данные и выберите действие:")
+
+    return "\n".join(parts)
+
+
+async def _send_draft_to_user(chat_id: int, telegram_id: int, template_slug: str, username: str | None, result: ProcessingResult):
+    """Sends the interactive draft back to the user and updates FSM."""
+    settings = get_settings()
+    bot = Bot(token=settings.telegram_bot_token.get_secret_value())
+    storage = RedisStorage.from_url(settings.redis_url)
+
+    try:
+        if result.state == ProcessingState.DONE and result.brief_data:
+            brief_data = result.brief_data
+            draft_text = _build_draft_text(brief_data)
+
+            # Update FSM State
+            key = StorageKey(bot_id=bot.id, chat_id=chat_id, user_id=telegram_id)
+            await storage.set_state(key, BriefState.reviewing_draft)
+            await storage.set_data(key, {
+                "brief_data": brief_data.model_dump(),
+                "original_text": brief_data.original_text,
+                "template_slug": template_slug,
+                "username": username,
+            })
+
+            # Feature 7: Missing Info Prompt
+            if brief_data.missing_info:
+                await bot.send_message(chat_id, draft_text, parse_mode="Markdown")
+                # Show client assessment
+                if brief_data.client_assessment:
+                    await bot.send_message(
+                        chat_id,
+                        f"🔍 *Оценка клиента (для вас):*\n\n{brief_data.client_assessment}",
+                        parse_mode="Markdown",
+                    )
+                # Ask about missing info
+                await bot.send_message(
+                    chat_id,
+                    f"💡 *Я заметил, что не хватает информации:*\n\n"
+                    f"_{brief_data.missing_info}_\n\n"
+                    f"Хотите указать недостающие данные сейчас?",
+                    reply_markup=missing_info_keyboard(),
+                    parse_mode="Markdown",
+                )
+            else:
+                await bot.send_message(
+                    chat_id,
+                    draft_text,
+                    reply_markup=draft_review_keyboard(),
+                    parse_mode="Markdown",
+                )
+                
+                # Show client assessment
+                if brief_data.client_assessment:
+                    await bot.send_message(
+                        chat_id,
+                        f"🔍 *Оценка клиента (для вас):*\n\n{brief_data.client_assessment}",
+                        parse_mode="Markdown",
+                    )
+
+        else:
+            error_text = result.error_message or "Ошибка анализа аудио. Попробуйте ещё раз."
+            await bot.send_message(chat_id, error_text)
+    finally:
+        await storage.close()
+        await bot.session.close()
+
+
 @celery.task(
-    name="process_voice_message",
+    name="task_analyze_request",
     bind=True,
     max_retries=3,
     queue="briefbot"
 )
-def process_voice_message(self, chat_id: int, telegram_id: int, audio_path: str, template_slug: str, username: str | None = None, file_id: str | None = None):
+def task_analyze_request(self, chat_id: int, telegram_id: int, audio_path: str, template_slug: str, username: str | None = None, file_id: str | None = None) -> dict:
     """
-    Celery task to run the BriefBot pipeline for voice messages.
+    Celery task to run the BriefBot pipeline for audio up to Draft generation.
+    Returns serialized BriefData if successful.
     """
-    logger.info("task_start", chat_id=chat_id, telegram_id=telegram_id, template=template_slug)
+    logger.info("task_analyze_started", chat_id=chat_id, telegram_id=telegram_id, template=template_slug)
 
     try:
-        # Create a fresh event loop for each task (Celery workers don't have one)
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-
         orchestrator = OrchestratorAgent()
 
-        # 1. Run the async pipeline
-        result = loop.run_until_complete(orchestrator.process(
+        result = loop.run_until_complete(orchestrator.process_audio_to_draft(
             chat_id=chat_id,
             telegram_id=telegram_id,
             audio_path=audio_path,
@@ -89,22 +179,71 @@ def process_voice_message(self, chat_id: int, telegram_id: int, audio_path: str,
             username=username,
             file_id=file_id,
         ))
-
-        # 2. Send result back to user
-        loop.run_until_complete(_send_result_to_user(chat_id, result))
+        
+        # Send interactive draft back to telegram
+        loop.run_until_complete(_send_draft_to_user(chat_id, telegram_id, template_slug, username, result))
 
         loop.close()
 
         if result.state == ProcessingState.FAILED:
-            logger.error("task_pipeline_failed", chat_id=chat_id, error=result.error_message)
+            logger.error("task_analyze_failed", chat_id=chat_id, error=result.error_message)
+            raise Exception(result.error_message)
         else:
-            logger.info("task_pipeline_success", chat_id=chat_id)
+            logger.info("task_analyze_success", chat_id=chat_id)
 
-        return result.model_dump()
+        return result.brief_data.model_dump() if result.brief_data else {}
 
     except Exception as exc:
-        logger.error("task_execution_error", chat_id=chat_id, error=str(exc), exc_info=True)
-        # Handle retry for transient errors
+        logger.error("task_analyze_error", chat_id=chat_id, error=str(exc), exc_info=True)
+        if self.request.retries < self.max_retries:
+            raise self.retry(exc=exc, countdown=10)
+        raise exc
+
+
+@celery.task(
+    name="task_generate_pdf",
+    bind=True,
+    max_retries=3,
+    queue="briefbot"
+)
+def task_generate_pdf(self, draft_data: dict, chat_id: int, telegram_id: int, template_slug: str, history_id: str | None = None):
+    """
+    Celery task to generate a PDF from the approved Interactive Draft and send it.
+    """
+    logger.info("task_generate_pdf_started", chat_id=chat_id, telegram_id=telegram_id, template=template_slug)
+
+    try:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        orchestrator = OrchestratorAgent()
+        
+        from app.models.brief import BriefData
+        brief_data = BriefData(**draft_data)
+        
+        # Let the orchestrator handle PDF generation, DB history, and upload
+        result = loop.run_until_complete(
+            orchestrator.process_with_brief_data(
+                chat_id=chat_id,
+                telegram_id=telegram_id,
+                brief_data=brief_data,
+                original_text=brief_data.original_text,
+                template_slug=template_slug,
+                username=None,
+                cleanup_pdf=False,
+            )
+        )
+
+        loop.run_until_complete(_send_result_to_user(chat_id, result))
+
+        # Cleanup local PDF after sending
+        if result.pdf_path:
+             orchestrator._cleanup_file(result.pdf_path)
+
+        loop.close()
+        logger.info("task_generate_pdf_success", chat_id=chat_id)
+
+    except Exception as exc:
+        logger.error("task_generate_pdf_error", chat_id=chat_id, error=str(exc), exc_info=True)
         if self.request.retries < self.max_retries:
             raise self.retry(exc=exc, countdown=10)
         raise exc
