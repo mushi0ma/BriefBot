@@ -71,6 +71,10 @@ class Settings(BaseSettings):
     sticker_stats_id: str = ""
     sticker_health_check_healthy_id: str = ""
     sticker_health_check_errors_id: str = ""
+    sticker_processing_id: str = ""
+    sticker_error_id: str = ""
+    sticker_welcome_admin_id: str = ""
+    sticker_notification_id: str = ""
 
 
 @lru_cache(maxsize=1)

@@ -18,7 +18,17 @@ import httpx
 import redis
 from aiogram import Bot, Dispatcher, Router, F
 from aiogram.filters import Command, CommandStart
-from aiogram.types import Message, CallbackQuery, FSInputFile, ReplyKeyboardMarkup, KeyboardButton
+from aiogram.types import (
+    BufferedInputFile,
+    CallbackQuery,
+    FSInputFile,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    Message,
+    ReplyKeyboardMarkup,
+    KeyboardButton,
+    WebAppInfo,
+)
 
 from app.config import get_settings
 from app.db.history_repo import HistoryRepo
@@ -145,9 +155,24 @@ async def cmd_stats(message: Message) -> None:
         success_rate = (brief_stats["successful"] / brief_stats["total_briefs"]) * 100
         text += f"\n📈 Успешность: *{success_rate:.1f}%*"
 
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[[InlineKeyboardButton(text="🔄 Обновить", callback_data="admin:stats:refresh")]]
+    )
+
     settings = get_settings()
+    await message.answer(text, reply_markup=keyboard, parse_mode="Markdown")
     await _send_sticker(message, settings.sticker_stats_id)
-    await message.answer(text, parse_mode="Markdown")
+
+
+@router.callback_query(F.data == "admin:stats:refresh")
+async def on_stats_refresh(callback: CallbackQuery) -> None:
+    """Handle stats refresh button."""
+    await callback.answer("Обновление статистики...")
+    # Just route to the main stats handler but we must pass a Message
+    # Since we need to reply to the current message:
+    message = callback.message
+    message.from_user = callback.from_user  # Mock from_user for _is_admin check
+    await cmd_stats(message)
 
 
 # ── /health ──────────────────────────────────────────────────────────────────
@@ -204,14 +229,27 @@ async def cmd_health(message: Message) -> None:
 
     text = "🏥 *Health Check*\n\n" + "\n".join(checks)
 
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[[InlineKeyboardButton(text="🔄 Проверить снова", callback_data="admin:health:refresh")]]
+    )
+
     settings = get_settings()
+    await message.answer(text, reply_markup=keyboard, parse_mode="Markdown")
+    
     has_errors = any("❌" in c or "⚠️" in c for c in checks)
     if has_errors:
         await _send_sticker(message, settings.sticker_health_check_errors_id)
     else:
         await _send_sticker(message, settings.sticker_health_check_healthy_id)
 
-    await message.answer(text, parse_mode="Markdown")
+
+@router.callback_query(F.data == "admin:health:refresh")
+async def on_health_refresh(callback: CallbackQuery) -> None:
+    """Handle health refresh button."""
+    await callback.answer("Проверка статусов...")
+    message = callback.message
+    message.from_user = callback.from_user  # Mock from_user for _is_admin check
+    await cmd_health(message)
 
 
 # ── /users ───────────────────────────────────────────────────────────────────
@@ -408,7 +446,6 @@ async def cmd_broadcast(message: Message) -> None:
     from app.bot.keyboards import broadcast_confirm_keyboard
 
     settings = get_settings()
-    await _send_sticker(message, settings.sticker_ask_id)
     await message.answer(
         f"📢 *Подтвердите рассылку*\n\n"
         f"Текст: _{text[:200]}_\n\n"
@@ -417,6 +454,7 @@ async def cmd_broadcast(message: Message) -> None:
         reply_markup=broadcast_confirm_keyboard(),
         parse_mode="Markdown",
     )
+    await _send_sticker(message, settings.sticker_ask_id)
 
 
 @router.callback_query(F.data == "broadcast:confirm")

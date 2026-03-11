@@ -90,12 +90,12 @@ async def cmd_start(message: Message, state: FSMContext) -> None:
     """Welcome message with banner + SPA-style inline menu."""
     await state.clear()
     settings = get_settings()
-    await _send_sticker(message, message.chat.id, settings.sticker_hello_id)
     await message.answer(
         WELCOME_TEXT,
         reply_markup=main_menu_keyboard(),
         parse_mode="Markdown",
     )
+    await _send_sticker(message, message.chat.id, settings.sticker_hello_id)
 
 
 # ── Menu Callbacks (SPA Navigation) ──────────────────────────────────────────
@@ -599,9 +599,11 @@ async def handle_text(message: Message, state: FSMContext) -> None:
         f"✅ Принято! (сообщений: {chunk_count})\n"
         "Напишите ещё детали или нажмите кнопку ниже.\n\n"
         f"Шаблон: *{template_slug}*",
+        f"Шаблон: *{template_slug}*",
         reply_markup=generate_brief_keyboard(),
         parse_mode="Markdown",
     )
+    await _send_sticker(message, message.chat.id, settings.sticker_think_id)
 
 
 # ── Generate Brief Callback (Text Flow) → Draft Mode ────────────────────────
@@ -683,6 +685,7 @@ async def on_generate_brief(callback: CallbackQuery, state: FSMContext, bot: Bot
             reply_markup=missing_info_keyboard(),
             parse_mode="MarkdownV2",
         )
+        await _send_sticker(bot, chat_id, settings.sticker_ask_id)
     else:
         await bot.send_message(
             chat_id,
@@ -790,7 +793,6 @@ async def on_draft_generate_pdf(callback: CallbackQuery, state: FSMContext, bot:
     # Send result to user
     settings = get_settings()
     if result.state == ProcessingState.DONE and result.pdf_path:
-        await _send_sticker(bot, chat_id, settings.sticker_success_id)
         summary_text = (
             f"*Бриф готов\!*\n\n"
             f"{_escape_md2(result.brief_data.summary)}\n\n"
@@ -813,6 +815,7 @@ async def on_draft_generate_pdf(callback: CallbackQuery, state: FSMContext, bot:
             caption="Ваш проектный бриф",
             reply_markup=feedback_keyboard(),
         )
+        await _send_sticker(bot, chat_id, settings.sticker_success_id)
 
         logger.info("draft_pdf_sent", user_id=user_id, time_ms=result.processing_time_ms)
     else:
