@@ -216,3 +216,15 @@ PATCH /api/settings использовал ad-hoc regex и typeof проверк
 ### Последствия
 *   **Хорошие:** Zero-trust auth, нет PII leak, timing-safe, TDD coverage.
 *   **Плохие:** Нет.
+
+## ADR-012: Playwright E2E Smoke Tests в CI
+
+### Контекст
+Юнит-тесты (Vitest) покрывают логику, но не проверяют реальную работу приложения в браузере. Ручные Puppeteer-тесты нашли продакшен стабильным, но не автоматизированы.
+
+### Решение
+Playwright E2E тесты в `e2e/smoke.spec.ts` (7 тестов): загрузка страницы, табы, hydration, CORS, 404 ассеты, API auth, навигация. Запускаются в CI после build, перед деплоем.
+
+### Последствия
+*   **Хорошие:** Автоматический smoke test перед каждым деплоем, отчёт в GitHub Artifacts.
+*   **Плохие:** +~30с к CI pipeline (установка Chromium).
