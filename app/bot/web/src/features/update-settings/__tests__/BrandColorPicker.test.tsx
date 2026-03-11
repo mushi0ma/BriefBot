@@ -10,17 +10,17 @@ describe('BrandColorPicker', () => {
     render(<BrandColorPicker value={null} onChange={() => {}} disabled={false} />);
     
     PRESET_COLORS.forEach(color => {
-      // Ищем кнопку по aria-label или style (проще по aria-label, добавим его в компонент)
       expect(screen.getByLabelText(`Select color ${color}`)).toBeInTheDocument();
     });
   });
 
-  it('shows checkmark on selected color', () => {
+  it('shows check icon on selected color', () => {
     const selectedColor = PRESET_COLORS[1];
     render(<BrandColorPicker value={selectedColor} onChange={() => {}} disabled={false} />);
     
     const selectedButton = screen.getByLabelText(`Select color ${selectedColor}`);
-    expect(selectedButton).toHaveTextContent('✓');
+    // Check icon renders as SVG inside the button
+    expect(selectedButton.querySelector('svg')).toBeInTheDocument();
   });
 
   it('calls onChange when a color is clicked', () => {

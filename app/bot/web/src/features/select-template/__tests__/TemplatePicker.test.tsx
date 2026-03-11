@@ -5,8 +5,8 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { TemplatePicker } from '../ui/TemplatePicker';
 
 const MOCK_TEMPLATES = [
-  { slug: 'default', icon: '🎯', name: 'Универсальный', desc: 'Подходит для любых проектов' },
-  { slug: 'design', icon: '🎨', name: 'Дизайн', desc: 'Визуальные проекты и брендинг' },
+  { slug: 'default', icon: 'target', name: 'Универсальный', desc: 'Подходит для любых проектов' },
+  { slug: 'design', icon: 'paintbrush', name: 'Дизайн', desc: 'Визуальные проекты и брендинг' },
 ];
 
 describe('TemplatePicker', () => {
@@ -24,7 +24,7 @@ describe('TemplatePicker', () => {
     expect(screen.getByText('Дизайн')).toBeInTheDocument();
   });
 
-  it('shows checkmark on selected template', () => {
+  it('shows check icon on selected template', () => {
     render(
       <TemplatePicker
         templates={MOCK_TEMPLATES}
@@ -34,9 +34,11 @@ describe('TemplatePicker', () => {
       />
     );
 
-    // The selected item should have a checkmark (✓)
+    // The selected item should have a check SVG icon
     const designButton = screen.getByText('Дизайн').closest('button')!;
-    expect(designButton.textContent).toContain('✓');
+    const svgs = designButton.querySelectorAll('svg');
+    // Should have at least 2 SVGs: the template icon + the check icon
+    expect(svgs.length).toBeGreaterThanOrEqual(2);
   });
 
   it('calls onSelect when a template is clicked', () => {

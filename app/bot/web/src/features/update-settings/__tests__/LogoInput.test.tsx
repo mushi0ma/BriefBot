@@ -21,12 +21,13 @@ describe('LogoInput', () => {
     expect(input.value).toBe('https://newlogo.com/test.png');
   });
 
-  it('calls onSave with input value when OK button is clicked', () => {
+  it('calls onSave with input value when save button is clicked', () => {
     const handleSave = vi.fn();
     render(<LogoInput initialValue="old" onSave={handleSave} disabled={false} />);
     
     const input = screen.getByRole('textbox') as HTMLInputElement;
-    const button = screen.getByRole('button', { name: /ok/i });
+    // Save button now uses an icon, find by button role
+    const button = screen.getByRole('button');
     
     fireEvent.change(input, { target: { value: 'new-logo' } });
     fireEvent.click(button);
@@ -38,6 +39,6 @@ describe('LogoInput', () => {
     render(<LogoInput initialValue="" onSave={() => {}} disabled={true} />);
     
     expect(screen.getByRole('textbox')).toBeDisabled();
-    expect(screen.getByRole('button', { name: /\.\.\./i })).toBeDisabled();
+    expect(screen.getByRole('button')).toBeDisabled();
   });
 });
