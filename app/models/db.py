@@ -43,7 +43,14 @@ CREATE TABLE IF NOT EXISTS brief_history (
 
 CREATE INDEX IF NOT EXISTS idx_history_user ON brief_history (user_id);
 CREATE INDEX IF NOT EXISTS idx_history_created ON brief_history (created_at DESC);
+
+-- Idempotent column additions for existing deployments
+ALTER TABLE brief_history ADD COLUMN IF NOT EXISTS title VARCHAR(255) DEFAULT '';
+ALTER TABLE brief_history ADD COLUMN IF NOT EXISTS keywords JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE brief_history ADD COLUMN IF NOT EXISTS is_downloaded BOOLEAN DEFAULT false;
+
 CREATE INDEX IF NOT EXISTS idx_history_keywords ON brief_history USING GIN (keywords);
+
 
 -- ── Templates ────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS templates (
