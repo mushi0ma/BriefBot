@@ -40,6 +40,16 @@ router = Router()
 _pending_broadcasts: dict[int, str] = {}
 
 
+async def _send_sticker(message: Message, sticker_id: str) -> None:
+    """Safely send a sticker. No-op if sticker_id is empty."""
+    if not sticker_id:
+        return
+    try:
+        await message.answer_sticker(sticker_id)
+    except Exception:
+        pass  # sticker send is best-effort
+
+
 def _is_admin(message: Message) -> bool:
     """Check if the sender is the authorized admin."""
     settings = get_settings()
@@ -135,6 +145,8 @@ async def cmd_stats(message: Message) -> None:
         success_rate = (brief_stats["successful"] / brief_stats["total_briefs"]) * 100
         text += f"\n📈 Успешность: *{success_rate:.1f}%*"
 
+    settings = get_settings()
+    await _send_sticker(message, settings.sticker_stats_id)
     await message.answer(text, parse_mode="Markdown")
 
 
@@ -191,6 +203,14 @@ async def cmd_health(message: Message) -> None:
         checks.append(f"❌ OpenAI: {e}")
 
     text = "🏥 *Health Check*\n\n" + "\n".join(checks)
+
+    settings = get_settings()
+    has_errors = any("❌" in c or "⚠️" in c for c in checks)
+    if has_errors:
+        await _send_sticker(message, settings.sticker_health_check_errors_id)
+    else:
+        await _send_sticker(message, settings.sticker_health_check_healthy_id)
+
     await message.answer(text, parse_mode="Markdown")
 
 
@@ -387,6 +407,8 @@ async def cmd_broadcast(message: Message) -> None:
 
     from app.bot.keyboards import broadcast_confirm_keyboard
 
+    settings = get_settings()
+    await _send_sticker(message, settings.sticker_ask_id)
     await message.answer(
         f"📢 *Подтвердите рассылку*\n\n"
         f"Текст: _{text[:200]}_\n\n"

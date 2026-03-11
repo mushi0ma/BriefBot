@@ -49,6 +49,25 @@ router = Router()
 # In-memory user template preference (per session)
 _user_templates: dict[int, str] = {}
 
+
+async def _send_sticker(target: Message | Bot, chat_id: int, sticker_id: str) -> None:
+    """Safely send a sticker. No-op if sticker_id is empty."""
+    if not sticker_id:
+        return
+    try:
+        if isinstance(target, Bot):
+            await target.send_sticker(chat_id, sticker_id)
+        else:
+            await target.answer_sticker(sticker_id)
+    except Exception as e:
+        logger.warning("sticker_send_failed", sticker_id=sticker_id, error=str(e))
+
+
+def _escape_md2(text: str) -> str:
+    """Escape special characters for Telegram MarkdownV2."""
+    special = r'_*[]()~`>#+-=|{}.!'
+    return ''.join(f'\\{c}' if c in special else c for c in text)
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Welcome text (used in /start and menu:back)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -70,6 +89,8 @@ WELCOME_TEXT = (
 async def cmd_start(message: Message, state: FSMContext) -> None:
     """Welcome message with banner + SPA-style inline menu."""
     await state.clear()
+    settings = get_settings()
+    await _send_sticker(message, message.chat.id, settings.sticker_hello_id)
     await message.answer(
         WELCOME_TEXT,
         reply_markup=main_menu_keyboard(),
@@ -373,13 +394,14 @@ async def handle_voice(message: Message, bot: Bot, state: FSMContext) -> None:
         file_id=file_id,
     )
 
-    # Send "processing" status with cancel button (Feature 6)
+    # Send "thinking" sticker + "processing" status with cancel button (Feature 6)
+    await _send_sticker(message, chat_id, settings.sticker_think_id)
     await message.answer(
-        "🎙 *Аудио получено...*\n\n"
-        f"Шаблон: {template_slug}\n"
-        "Передаю в обработку ИИ.\n\n"
-        "Ожидайте создания черновика.",
-        parse_mode="Markdown",
+        "🎙 *Аудио получено\.\.\.*\n\n"
+        f"Шаблон: {_escape_md2(template_slug)}\n"
+        "Передаю в обработку ИИ\.\n\n"
+        "Ожидайте создания черновика\.",
+        parse_mode="MarkdownV2",
         reply_markup=cancel_task_keyboard(task.id),
     )
 
@@ -445,10 +467,11 @@ async def handle_draft_edit(message: Message, state: FSMContext, bot: Bot) -> No
     )
     await state.set_state(BriefState.reviewing_draft)
 
+    await _send_sticker(message, message.chat.id, get_settings().sticker_okay_id)
     await message.answer(
         draft_text,
         reply_markup=draft_review_keyboard(),
-        parse_mode="Markdown",
+        parse_mode="MarkdownV2",
     )
 
     # Show client assessment
@@ -494,7 +517,7 @@ async def handle_missing_info_text(message: Message, state: FSMContext, bot: Bot
     await message.answer(
         draft_text,
         reply_markup=draft_review_keyboard(),
-        parse_mode="Markdown",
+        parse_mode="MarkdownV2",
     )
 
 
@@ -601,11 +624,13 @@ async def on_generate_brief(callback: CallbackQuery, state: FSMContext, bot: Bot
     combined_text = "\n\n".join(text_buffer)
     await callback.answer("Анализирую текст...")
 
+    settings = get_settings()
+    await _send_sticker(bot, chat_id, settings.sticker_think_id)
     await callback.message.edit_text(
-        "*Анализирую текст...*\n\n"
-        f"Шаблон: {template_slug}\n"
+        "*Анализирую текст\.\.\.*\n\n"
+        f"Шаблон: {_escape_md2(template_slug)}\n"
         f"Сообщений обработано: {len(text_buffer)}",
-        parse_mode="Markdown",
+        parse_mode="MarkdownV2",
     )
 
     # Run AI analysis only (no PDF yet)
@@ -637,32 +662,33 @@ async def on_generate_brief(callback: CallbackQuery, state: FSMContext, bot: Bot
         await bot.send_message(
             chat_id,
             draft_text,
-            parse_mode="Markdown",
+            parse_mode="MarkdownV2",
         )
 
         # Show client assessment
         if brief_data.client_assessment:
             await bot.send_message(
                 chat_id,
-                f"🔍 *Оценка клиента (для вас):*\n\n{brief_data.client_assessment}",
-                parse_mode="Markdown",
+                f"🔍 *Оценка клиента \(для вас\):*\n\n{_escape_md2(brief_data.client_assessment)}",
+                parse_mode="MarkdownV2",
             )
 
         # Ask about missing info
+        await _send_sticker(bot, chat_id, settings.sticker_ask_id)
         await bot.send_message(
             chat_id,
             f"💡 *Я заметил, что не хватает информации:*\n\n"
-            f"_{brief_data.missing_info}_\n\n"
+            f"_{_escape_md2(brief_data.missing_info)}_\n\n"
             f"Хотите указать недостающие данные сейчас?",
             reply_markup=missing_info_keyboard(),
-            parse_mode="Markdown",
+            parse_mode="MarkdownV2",
         )
     else:
         await bot.send_message(
             chat_id,
             draft_text,
             reply_markup=draft_review_keyboard(),
-            parse_mode="Markdown",
+            parse_mode="MarkdownV2",
         )
 
         # Show client assessment
@@ -686,11 +712,12 @@ async def on_fill_missing_info(callback: CallbackQuery, state: FSMContext) -> No
     await state.update_data(missing_field=missing)
 
     await callback.answer()
+    await _send_sticker(callback.message, callback.message.chat.id, get_settings().sticker_ask_id)
     await callback.message.edit_text(
         f"✍ *Введите недостающую информацию:*\n\n"
-        f"_{missing}_\n\n"
+        f"_{_escape_md2(missing)}_\n\n"
         f"Напишите ваш ответ текстом:",
-        parse_mode="Markdown",
+        parse_mode="MarkdownV2",
     )
 
 
@@ -698,10 +725,12 @@ async def on_fill_missing_info(callback: CallbackQuery, state: FSMContext) -> No
 async def on_skip_missing_info(callback: CallbackQuery, state: FSMContext) -> None:
     """Skip missing info and proceed to PDF generation options."""
     await callback.answer()
+    await _send_sticker(callback.message, callback.message.chat.id, get_settings().sticker_okay_id)
     await callback.message.edit_text(
-        "⏭ Пропускаем недостающую информацию.\n\n"
+        "⏭ Пропускаем недостающую информацию\.\n\n"
         "Выберите действие:",
         reply_markup=draft_review_keyboard(),
+        parse_mode="MarkdownV2",
     )
 
 
@@ -759,20 +788,22 @@ async def on_draft_generate_pdf(callback: CallbackQuery, state: FSMContext, bot:
     )
 
     # Send result to user
+    settings = get_settings()
     if result.state == ProcessingState.DONE and result.pdf_path:
+        await _send_sticker(bot, chat_id, settings.sticker_success_id)
         summary_text = (
-            f"*Бриф готов!*\n\n"
-            f"{result.brief_data.summary}\n\n"
-            "Полный бриф прикреплен ниже."
+            f"*Бриф готов\!*\n\n"
+            f"{_escape_md2(result.brief_data.summary)}\n\n"
+            "Полный бриф прикреплен ниже\."
         )
-        await bot.send_message(chat_id, summary_text, parse_mode="Markdown")
+        await bot.send_message(chat_id, summary_text, parse_mode="MarkdownV2")
 
         # Show client assessment (Telegram only, not in PDF)
         if result.brief_data.client_assessment:
             await bot.send_message(
                 chat_id,
-                f"🔍 *Оценка клиента (для вас):*\n\n{result.brief_data.client_assessment}",
-                parse_mode="Markdown",
+                f"🔍 *Оценка клиента \(для вас\):*\n\n{_escape_md2(result.brief_data.client_assessment)}",
+                parse_mode="MarkdownV2",
             )
 
         pdf_file = FSInputFile(result.pdf_path)
@@ -794,15 +825,16 @@ async def on_draft_generate_pdf(callback: CallbackQuery, state: FSMContext, bot:
 async def on_draft_edit(callback: CallbackQuery, state: FSMContext) -> None:
     """Switch to editing mode — user sends correction text."""
     await callback.answer()
+    await _send_sticker(callback.message, callback.message.chat.id, get_settings().sticker_okay_id)
     await state.set_state(BriefState.editing_draft)
     await callback.message.edit_text(
         "*Режим исправления*\n\n"
-        "Напишите, что нужно изменить. Например:\n"
-        "- «бюджет не 50к, а 100к»\n"
-        "- «дедлайн — 3 недели, не 2»\n"
-        "- «добавить требование: мобильная версия»\n\n"
+        "Напишите, что нужно изменить\. Например:\n"
+        "\\- «бюджет не 50к, а 100к»\n"
+        "\\- «дедлайн — 3 недели, не 2»\n"
+        "\\- «добавить требование: мобильная версия»\n\n"
         "Отправьте текст с исправлениями:",
-        parse_mode="Markdown",
+        parse_mode="MarkdownV2",
     )
 
 
@@ -919,24 +951,31 @@ async def on_feedback(callback: CallbackQuery) -> None:
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 def _build_draft_text(brief_data) -> str:
-    """Build a formatted draft summary text for user review."""
-    parts = ["*Черновик брифа:*\n"]
+    """Build a MarkdownV2 formatted draft summary with block quotes."""
+    parts = ["📋 *Черновик брифа:*\n"]
 
-    if brief_data.summary:
-        parts.append(f"*Резюме:* {brief_data.summary}\n")
-    if brief_data.service_type:
-        parts.append(f"*Тип услуги:* {brief_data.service_type}")
-    if brief_data.deadline:
-        parts.append(f"*Сроки:* {brief_data.deadline}")
-    if brief_data.budget:
-        parts.append(f"*Бюджет:* {brief_data.budget}")
-    if brief_data.wishes:
-        parts.append(f"*Пожелания:* {brief_data.wishes}")
+    def _field(label: str, value: str) -> None:
+        if value:
+            parts.append(f"*{_escape_md2(label)}:*")
+            for line in value.split('\n'):
+                parts.append(f"> {_escape_md2(line)}")
+            parts.append("")  # blank line after block quote
+
+    _field("Резюме", brief_data.summary)
+    _field("Тип услуги", brief_data.service_type)
+    _field("Сроки", brief_data.deadline)
+    _field("Бюджет", brief_data.budget)
+    _field("Пожелания", brief_data.wishes)
+
+    # Extra template sections
+    for section in brief_data.extra_sections:
+        _field(section.title, section.value)
 
     if brief_data.missing_info:
         parts.append(
-            f"\n⚠️ *Нехватающая информация:*\n{brief_data.missing_info}\n"
-            "_Напишите уточнения или нажмите «Сгенерировать PDF»._"
+            f"\n⚠️ *Нехватающая информация:*\n"
+            f"> _{_escape_md2(brief_data.missing_info)}_\n\n"
+            f"_Напишите уточнения или нажмите «Сгенерировать PDF»\._"
         )
 
     parts.append("\nПроверьте данные и выберите действие:")
