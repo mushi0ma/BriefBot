@@ -61,3 +61,14 @@ out/
 # Typescript
 *.tsbuildinfo
 next-env.d.ts
+# Test outputs and caches
+.pytest_cache/
+tests/outputs/
+coverage/
+.coverage
+.ruff_cache/
+.mypy_cache/
+
+# AI Assistants
+.gemini/
+.cursor/
