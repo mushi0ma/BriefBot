@@ -1,12 +1,11 @@
 {
-  "dependencies": {
-    "zod": "^4.3.6"
-  },
-  "devDependencies": {
-    "@testing-library/jest-dom": "^6.9.1",
-    "@testing-library/react": "^16.3.2",
-    "@vitejs/plugin-react": "^5.1.4",
-    "jsdom": "^28.1.0",
-    "vitest": "^4.0.18"
+  "private": true,
+  "scripts": {
+    "test": "cd app/bot/web && npx vitest run",
+    "test:watch": "cd app/bot/web && npx vitest",
+    "test:e2e": "cd app/bot/web && npx playwright test",
+    "build": "cd app/bot/web && npx next build",
+    "dev": "cd app/bot/web && npx next dev",
+    "lint": "cd app/bot/web && npx next lint"
   }
 }

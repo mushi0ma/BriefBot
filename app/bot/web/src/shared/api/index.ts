@@ -1,1 +1,1 @@
-export { createApiFetch } from './apiFetch';
+export { createApiFetch, ApiError } from './apiFetch';
