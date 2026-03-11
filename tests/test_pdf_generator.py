@@ -88,6 +88,8 @@ class TestPDFGenerator:
             missing_info="",
             summary="",
             original_text="",
+            extra_sections=[],
+            client_assessment="",
         )
         try:
             pdf_path = generate_pdf(empty_data, sample_template)

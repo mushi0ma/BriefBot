@@ -42,6 +42,7 @@ class BriefData(BaseModel):
         default_factory=list,
         description="Additional template-specific sections",
     )
+    client_assessment: str = Field(default="", description="Assessment of the client's adequacy and readiness")
     summary: str = Field(default="", description="Short summary of the entire request")
     original_text: str = Field(default="", description="Full transcription text")
 

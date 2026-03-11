@@ -28,12 +28,8 @@ class TestUserRepoRetry:
         # First 2 calls raise, 3rd returns data
         mock_table = MagicMock()
         mock_sb.table.return_value = mock_table
-        mock_select = MagicMock()
-        mock_table.select.return_value = mock_select
-        mock_eq = MagicMock()
-        mock_select.eq.return_value = mock_eq
-        mock_limit = MagicMock()
-        mock_eq.limit.return_value = mock_limit
+        mock_upsert = MagicMock()
+        mock_table.upsert.return_value = mock_upsert
 
         call_count = 0
         def execute_side_effect():
@@ -45,7 +41,7 @@ class TestUserRepoRetry:
             result.data = [{"id": "user-1", "telegram_id": 111}]
             return result
 
-        mock_limit.execute.side_effect = execute_side_effect
+        mock_upsert.execute.side_effect = execute_side_effect
 
         from app.db.user_repo import UserRepo
         user = await UserRepo.get_or_create(111, "testuser")
@@ -62,19 +58,15 @@ class TestUserRepoRetry:
 
         mock_table = MagicMock()
         mock_sb.table.return_value = mock_table
-        mock_select = MagicMock()
-        mock_table.select.return_value = mock_select
-        mock_eq = MagicMock()
-        mock_select.eq.return_value = mock_eq
-        mock_limit = MagicMock()
-        mock_eq.limit.return_value = mock_limit
-        mock_limit.execute.side_effect = ConnectionError("persistent DB error")
+        mock_upsert = MagicMock()
+        mock_table.upsert.return_value = mock_upsert
+        mock_upsert.execute.side_effect = ConnectionError("persistent DB error")
 
         from app.db.user_repo import UserRepo
         with pytest.raises(ConnectionError, match="persistent DB error"):
             await UserRepo.get_or_create(222, "fail_user")
 
-        assert mock_limit.execute.call_count == 3
+        assert mock_upsert.execute.call_count == 3
 
     @pytest.mark.asyncio
     @patch("app.db.user_repo.get_supabase")

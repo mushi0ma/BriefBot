@@ -32,26 +32,32 @@ class UserRepo:
 
     @staticmethod
     async def get_or_create(telegram_id: int, username: str = "", first_name: str = "", last_name: str = "") -> dict[str, Any]:
-        """Fetch a user by telegram_id, or create a new record."""
+        """Fetch a user by telegram_id, or create a new record using atomic upsert."""
 
         @_retry
         def _inner() -> dict[str, Any]:
             sb = get_supabase()
-            result = sb.table(UserRepo.TABLE).select("*").eq("telegram_id", telegram_id).limit(1).execute()
-
-            if result and result.data and len(result.data) > 0:
-                logger.debug("user_found", telegram_id=telegram_id)
-                return result.data[0]
-
-            new_user = {
+            
+            user_data = {
                 "telegram_id": telegram_id,
                 "username": username,
                 "first_name": first_name,
                 "last_name": last_name,
             }
-            insert_result = sb.table(UserRepo.TABLE).insert(new_user).execute()
-            logger.info("user_created", telegram_id=telegram_id, username=username)
-            return insert_result.data[0]
+            
+            # Use upsert to avoid race conditions. on_conflict="telegram_id" ensures 
+            # we update if exists, insert if not. However, we only care about getting
+            # the record back safely.
+            result = sb.table(UserRepo.TABLE).upsert(
+                user_data, 
+                on_conflict="telegram_id"
+            ).execute()
+            
+            if result and result.data and len(result.data) > 0:
+                logger.debug("user_upserted", telegram_id=telegram_id, username=username)
+                return result.data[0]
+                
+            raise Exception("Upsert returned no data")
 
         return await asyncio.to_thread(_inner)
 
