@@ -5,7 +5,6 @@ describe('TemplateSchema', () => {
   it('validates a correct template object', () => {
     const result = TemplateSchema.safeParse({
       slug: 'design',
-      icon: '🎨',
       name: 'Дизайн',
       desc: 'Визуальные проекты',
     });
@@ -14,7 +13,6 @@ describe('TemplateSchema', () => {
 
   it('fails on missing slug', () => {
     const result = TemplateSchema.safeParse({
-      icon: '🎨',
       name: 'Дизайн',
       desc: 'Визуальные проекты',
     });

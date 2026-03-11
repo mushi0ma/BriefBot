@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useTelegram } from "@/src/shared/lib/telegram";
 import { type Brief } from "@/src/entities/brief";
 import { type UserSettings } from "@/src/entities/user";
-import { TabIcon, type Tab } from "@/src/shared/ui";
+import { TabIcon, type Tab, SkeletonSection, SkeletonColorGrid } from "@/src/shared/ui";
 import { createApiFetch } from "@/src/shared/api";
 import { AlertCircle, RefreshCw } from "lucide-react";
 import { HistoryTab } from "@/src/widgets/history-tab";
@@ -89,13 +89,38 @@ export default function Dashboard() {
       )}
 
       {loading ? (
-        <div className="px-4 space-y-3 animate-in">
-          {[1, 2, 3].map(i => (
-            <div key={i} className="tg-section p-4 space-y-2">
-              <div className="skeleton h-4 w-3/4" />
-              <div className="skeleton h-3 w-1/2" />
+        <div className="animate-in">
+          {tab === "history" && (
+            <>
+              <div className="flex items-center gap-2 px-4 mb-3">
+                <div className="skeleton h-10 flex-1 rounded-xl" />
+                <div className="skeleton h-10 flex-1 rounded-xl" />
+              </div>
+              <div className="flex items-center gap-2 px-4 mb-1 mt-4">
+                <div className="skeleton h-3 w-24" />
+              </div>
+              <SkeletonSection rows={4} />
+            </>
+          )}
+          {tab === "settings" && (
+            <div className="space-y-6">
+              <section>
+                <div className="flex items-center gap-2 px-4 mb-2">
+                  <div className="skeleton h-3 w-28" />
+                </div>
+                <SkeletonColorGrid />
+              </section>
+              <section>
+                <div className="flex items-center gap-2 px-4 mb-2">
+                  <div className="skeleton h-3 w-20" />
+                </div>
+                <div className="mx-4 tg-section rounded-xl p-4">
+                  <div className="skeleton h-10 w-full rounded-lg" />
+                </div>
+              </section>
             </div>
-          ))}
+          )}
+          {tab === "templates" && <SkeletonSection rows={4} />}
         </div>
       ) : error ? (
         <div className="px-4 py-12 flex flex-col items-center gap-4 text-center animate-in">
