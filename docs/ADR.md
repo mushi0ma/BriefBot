@@ -1,4 +1,32 @@
 # Architecture Decision Records
+
+## ADR-018: Centralized Sticker Registry and Resilient Delivery
+
+**Date:** 2026-03-12
+
+### Status
+Accepted
+
+### Context
+Animated stickers (TGS/WebM) were introduced to provide visual feedback during bot interactions (e.g., onboarding, processing, success, missing fields). Initially, sticker IDs were fetched directly from configuration settings within individual handlers (`main_bot.py`, `admin_bot.py`, `tasks.py`), leading to duplicate code and direct configuration coupling.
+Furthermore, the ephemeral `processing` sticker was initially tracked via Redis FSM, which caused race conditions and orphaned stickers if tasks completed before the state was fully saved.
+
+### Decision
+1. **`StickerRegistry`**: Implemented a localized dataclass in `app/bot/stickers.py` mapping `.env` sticker configurations to typed variables, preventing repetitive `get_settings()` lookups across handlers and decentralizing visual asset management.
+2. **Stateless Delivery & Deletion Utilities**: Created `send_temporary_sticker` and `delete_sticker_safe` to encapsulate error handling (`TelegramBadRequest`) and abstract away the underlying `bot` / `message` interface implementation.
+3. **Stateless Tracking**: Modified Celery task dispatches to pass the volatile `processing_msg_id` directly through function arguments instead of Redis FSM storage, fixing concurrent race conditions.
+
+### Consequences
+**Positive:**
+- Complete decoupling of code dealing with visual representations and state machines.
+- Elimination of race conditions when deleting processing indicators across distributed systems (Celery Workers).
+- Better isolation and 100% test coverage for visual delivery components.
+
+**Negative:**
+- Requires instantiating `StickerRegistry` inside handlers requiring visual indicators.
+
+---
+
 ## ADR-017: Flexible Brief Schema & pgvector
 
 **Date:** 2026-03-12

@@ -15,6 +15,7 @@ from aiogram.fsm.storage.base import StorageKey
 from app.bot.states import BriefState
 
 from app.config import get_settings
+from app.bot.stickers import StickerRegistry, send_temporary_sticker, delete_sticker_safe
 from app.logger import get_logger
 from app.worker.celery_app import celery_app as celery
 from app.services.orchestrator import OrchestratorAgent
@@ -35,7 +36,7 @@ async def _send_result_to_user(chat_id: int, result: ProcessingResult):
             # Send Success Sticker
             if settings.sticker_success_id:
                 try:
-                    await bot.send_sticker(chat_id, settings.sticker_success_id)
+                    await send_temporary_sticker(bot, chat_id, StickerRegistry.from_settings(get_settings()).SUCCESS)
                 except Exception as e:
                     logger.warning("sticker_send_failed", sticker_id=settings.sticker_success_id, error=str(e))
 
@@ -61,7 +62,7 @@ async def _send_result_to_user(chat_id: int, result: ProcessingResult):
             # Send Error Sticker
             if settings.sticker_error_id:
                 try:
-                    await bot.send_sticker(chat_id, settings.sticker_error_id)
+                    await send_temporary_sticker(bot, chat_id, StickerRegistry.from_settings(get_settings()).ERROR)
                 except Exception as e:
                     logger.warning("sticker_send_failed", sticker_id=settings.sticker_error_id, error=str(e))
 
@@ -109,10 +110,7 @@ async def _send_draft_to_user(chat_id: int, telegram_id: int, template_slug: str
 
             # Delete processing sticker if we had one
             if processing_msg_id:
-                try:
-                    await bot.delete_message(chat_id, processing_msg_id)
-                except Exception as e:
-                    logger.warning("failed_to_delete_processing_sticker", msg_id=processing_msg_id, error=str(e))
+                await delete_sticker_safe(bot, chat_id, processing_msg_id)
 
             await storage.set_state(key, BriefState.reviewing_draft)
             await storage.set_data(key, {
@@ -129,7 +127,7 @@ async def _send_draft_to_user(chat_id: int, telegram_id: int, template_slug: str
                 # Ask about missing info
                 if settings.sticker_missing_fields_id:
                      try:
-                         await bot.send_sticker(chat_id, settings.sticker_missing_fields_id)
+                         await send_temporary_sticker(bot, chat_id, StickerRegistry.from_settings(get_settings()).MISSING_FIELDS)
                      except Exception as e:
                          logger.warning("sticker_send_failed", sticker_id=settings.sticker_missing_fields_id, error=str(e))
                 await bot.send_message(
@@ -153,14 +151,11 @@ async def _send_draft_to_user(chat_id: int, telegram_id: int, template_slug: str
         else:
             # Also cleanup processing sticker on failure if state permits
             if processing_msg_id:
-                try:
-                    await bot.delete_message(chat_id, processing_msg_id)
-                except Exception as e:
-                    logger.warning("failed_to_delete_processing_sticker_on_error", error=str(e))
+                await delete_sticker_safe(bot, chat_id, processing_msg_id)
 
             if settings.sticker_error_id:
                 try:
-                    await bot.send_sticker(chat_id, settings.sticker_error_id)
+                    await send_temporary_sticker(bot, chat_id, StickerRegistry.from_settings(get_settings()).ERROR)
                 except Exception as e:
                     logger.warning("sticker_send_failed", sticker_id=settings.sticker_error_id, error=str(e))
 

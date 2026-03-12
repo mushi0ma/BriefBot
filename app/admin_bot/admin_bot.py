@@ -31,6 +31,7 @@ from aiogram.types import (
 )
 
 from app.config import get_settings
+from app.bot.stickers import StickerRegistry, send_temporary_sticker
 from app.db.history_repo import HistoryRepo
 from app.db.template_repo import (
     TemplateDBRepo,
@@ -50,14 +51,7 @@ router = Router()
 _pending_broadcasts: dict[int, str] = {}
 
 
-async def _send_sticker(message: Message, sticker_id: str) -> None:
-    """Safely send a sticker. No-op if sticker_id is empty."""
-    if not sticker_id:
-        return
-    try:
-        await message.answer_sticker(sticker_id)
-    except Exception:
-        pass  # sticker send is best-effort
+
 
 
 def _is_admin(message: Message) -> bool:
@@ -163,7 +157,8 @@ async def cmd_stats(message: Message) -> None:
 
     settings = get_settings()
     await message.answer(text, reply_markup=keyboard, parse_mode="Markdown")
-    await _send_sticker(message, settings.sticker_stats_id)
+    registry = StickerRegistry.from_settings(settings)
+    await send_temporary_sticker(message, message.chat.id, registry.STATS)
 
 
 @router.callback_query(F.data == "admin:stats:refresh")
@@ -240,9 +235,11 @@ async def cmd_health(message: Message) -> None:
     
     has_errors = any("❌" in c or "⚠️" in c for c in checks)
     if has_errors:
-        await _send_sticker(message, settings.sticker_health_check_errors_id)
+        registry = StickerRegistry.from_settings(settings)
+        await send_temporary_sticker(message, message.chat.id, registry.HEALTH_ERRORS)
     else:
-        await _send_sticker(message, settings.sticker_health_check_healthy_id)
+        registry = StickerRegistry.from_settings(settings)
+        await send_temporary_sticker(message, message.chat.id, registry.HEALTH_HEALTHY)
 
 
 @router.callback_query(F.data == "admin:health:refresh")
@@ -456,7 +453,8 @@ async def cmd_broadcast(message: Message) -> None:
         reply_markup=broadcast_confirm_keyboard(),
         parse_mode="Markdown",
     )
-    await _send_sticker(message, settings.sticker_missing_fields_id)
+    registry = StickerRegistry.from_settings(settings)
+    await send_temporary_sticker(message, message.chat.id, registry.MISSING_FIELDS)
 
 
 @router.callback_query(F.data == "broadcast:confirm")

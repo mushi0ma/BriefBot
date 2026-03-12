@@ -35,6 +35,7 @@ from app.bot.keyboards import (
 from app.bot.middlewares import ErrorHandlerMiddleware, LoggingMiddleware, ThrottlingMiddleware
 from app.bot.states import BriefState
 from app.config import get_settings
+from app.bot.stickers import StickerRegistry, send_temporary_sticker, delete_sticker_safe
 from app.db.history_repo import HistoryRepo
 from app.db.user_repo import UserRepo
 from app.logger import get_logger
@@ -50,10 +51,7 @@ router = Router()
 _user_templates: dict[int, str] = {}
 
 
-async def _send_sticker(target: Message | Bot, chat_id: int, sticker_id: str) -> Message | None:
-    """Safely send a sticker. No-op if sticker_id is empty. Returns the Message object if sent."""
-    if not sticker_id:
-        return None
+
     try:
         if isinstance(target, Bot):
             return await target.send_sticker(chat_id, sticker_id)
@@ -96,7 +94,7 @@ async def cmd_start(message: Message, state: FSMContext) -> None:
         reply_markup=main_menu_keyboard(),
         parse_mode="Markdown",
     )
-    await _send_sticker(message, message.chat.id, settings.sticker_onboarding_id)
+    await send_temporary_sticker(message, message.chat.id, StickerRegistry.from_settings(get_settings()).ONBOARDING)
 
 
 # ── Menu Callbacks (SPA Navigation) ──────────────────────────────────────────
@@ -386,8 +384,8 @@ async def handle_voice(message: Message, bot: Bot, state: FSMContext) -> None:
         return
 
     # Send "processing" sticker FIRST so we capture its ID
-    sticker_msg = await _send_sticker(message, chat_id, settings.sticker_processing_id)
-    processing_msg_id = sticker_msg.message_id if sticker_msg else None
+    registry = StickerRegistry.from_settings(settings)
+    processing_msg_id = await send_temporary_sticker(message, chat_id, registry.PROCESSING)
 
     if processing_msg_id:
         await state.update_data(processing_sticker_msg_id=processing_msg_id)
@@ -429,10 +427,7 @@ async def on_cancel_task(callback: CallbackQuery, bot: Bot, state: FSMContext) -
         data = await state.get_data()
         processing_msg_id = data.get("processing_sticker_msg_id")
         if processing_msg_id:
-            try:
-                await bot.delete_message(callback.message.chat.id, processing_msg_id)
-            except Exception:
-                pass
+            await delete_sticker_safe(bot, callback.message.chat.id, processing_msg_id)
 
         await callback.answer("Задача отменена.")
         await callback.message.edit_text(
@@ -484,7 +479,7 @@ async def handle_draft_edit(message: Message, state: FSMContext, bot: Bot) -> No
     )
     await state.set_state(BriefState.reviewing_draft)
 
-    await _send_sticker(message, message.chat.id, get_settings().sticker_success_id)
+    await send_temporary_sticker(message, message.chat.id, StickerRegistry.from_settings(get_settings()).SUCCESS)
     await message.answer(
         draft_text,
         reply_markup=draft_review_keyboard(),
@@ -636,7 +631,8 @@ async def on_generate_brief(callback: CallbackQuery, state: FSMContext, bot: Bot
     await callback.answer("Анализирую текст...")
 
     settings = get_settings()
-    sticker_msg = await _send_sticker(bot, chat_id, settings.sticker_processing_id)
+    registry = StickerRegistry.from_settings(settings)
+    processing_msg_id = await send_temporary_sticker(bot, chat_id, registry.PROCESSING)
 
     await callback.message.edit_text(
         "*Анализирую текст\.\.\.*\n\n"
@@ -656,18 +652,12 @@ async def on_generate_brief(callback: CallbackQuery, state: FSMContext, bot: Bot
         logger.error("draft_generation_failed", error=str(e), user_id=user_id)
         await bot.send_message(chat_id, "Произошла ошибка при анализе текста. Попробуйте ещё раз.")
         if sticker_msg:
-            try:
-                await bot.delete_message(chat_id, sticker_msg.message_id)
-            except Exception as e2:
-                logger.warning("failed_to_delete_sticker_on_generate", error=str(e2))
+            await delete_sticker_safe(bot, chat_id, sticker_msg.message_id)
         return
 
     # Delete processing sticker on success
     if sticker_msg:
-        try:
-            await bot.delete_message(chat_id, sticker_msg.message_id)
-        except Exception as e:
-            logger.warning("failed_to_delete_sticker_on_generate", error=str(e))
+        await delete_sticker_safe(bot, chat_id, sticker_msg.message_id)
 
     # Build draft summary
     draft_text = _build_draft_text(brief_data)
@@ -692,7 +682,7 @@ async def on_generate_brief(callback: CallbackQuery, state: FSMContext, bot: Bot
         # Client assessment removed per user request
 
         # Ask about missing info
-        await _send_sticker(bot, chat_id, settings.sticker_missing_fields_id)
+        await send_temporary_sticker(bot, chat_id, StickerRegistry.from_settings(get_settings()).MISSING_FIELDS)
         await bot.send_message(
             chat_id,
             f"💡 *Я заметил, что не хватает информации:*\n\n"
@@ -724,7 +714,7 @@ async def on_fill_missing_info(callback: CallbackQuery, state: FSMContext) -> No
     await state.update_data(missing_field=missing)
 
     await callback.answer()
-    await _send_sticker(callback.message, callback.message.chat.id, get_settings().sticker_missing_fields_id)
+    await send_temporary_sticker(callback.message, callback.message.chat.id, StickerRegistry.from_settings(get_settings()).MISSING_FIELDS)
     parts = [f"✍ *Введите недостающую информацию:*\n"]
     for line in missing.split('\n'):
         parts.append(f"_{_escape_md2(line)}_")
@@ -740,7 +730,7 @@ async def on_fill_missing_info(callback: CallbackQuery, state: FSMContext) -> No
 async def on_skip_missing_info(callback: CallbackQuery, state: FSMContext) -> None:
     """Skip missing info and proceed to PDF generation options."""
     await callback.answer()
-    await _send_sticker(callback.message, callback.message.chat.id, get_settings().sticker_success_id)
+    await send_temporary_sticker(callback.message, callback.message.chat.id, StickerRegistry.from_settings(get_settings()).SUCCESS)
     await callback.message.edit_text(
         "⏭ Пропускаем недостающую информацию\.\n\n"
         "Выберите действие:",
@@ -821,7 +811,7 @@ async def on_draft_generate_pdf(callback: CallbackQuery, state: FSMContext, bot:
             caption="Ваш проектный бриф",
             reply_markup=feedback_keyboard(),
         )
-        await _send_sticker(bot, chat_id, settings.sticker_success_id)
+        await send_temporary_sticker(bot, chat_id, StickerRegistry.from_settings(get_settings()).SUCCESS)
 
         logger.info("draft_pdf_sent", user_id=user_id, time_ms=result.processing_time_ms)
     else:
@@ -834,7 +824,7 @@ async def on_draft_generate_pdf(callback: CallbackQuery, state: FSMContext, bot:
 async def on_draft_edit(callback: CallbackQuery, state: FSMContext) -> None:
     """Switch to editing mode — user sends correction text."""
     await callback.answer()
-    await _send_sticker(callback.message, callback.message.chat.id, get_settings().sticker_okay_id)
+    await send_temporary_sticker(callback.message, callback.message.chat.id, StickerRegistry.from_settings(get_settings()).SUCCESS)
     await state.set_state(BriefState.editing_draft)
     await callback.message.edit_text(
         "*Режим исправления*\n\n"
