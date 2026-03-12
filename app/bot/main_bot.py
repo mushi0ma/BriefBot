@@ -51,17 +51,6 @@ router = Router()
 _user_templates: dict[int, str] = {}
 
 
-
-    try:
-        if isinstance(target, Bot):
-            return await target.send_sticker(chat_id, sticker_id)
-        else:
-            return await target.answer_sticker(sticker_id)
-    except Exception as e:
-        logger.warning("sticker_send_failed", sticker_id=sticker_id, error=str(e))
-        return None
-
-
 def _escape_md2(text: str) -> str:
     """Escape special characters for Telegram MarkdownV2."""
     special = r'_*[]()~`>#+-=|{}.!'
@@ -651,13 +640,13 @@ async def on_generate_brief(callback: CallbackQuery, state: FSMContext, bot: Bot
     except Exception as e:
         logger.error("draft_generation_failed", error=str(e), user_id=user_id)
         await bot.send_message(chat_id, "Произошла ошибка при анализе текста. Попробуйте ещё раз.")
-        if sticker_msg:
-            await delete_sticker_safe(bot, chat_id, sticker_msg.message_id)
+        if processing_msg_id:
+            await delete_sticker_safe(bot, chat_id, processing_msg_id)
         return
 
     # Delete processing sticker on success
-    if sticker_msg:
-        await delete_sticker_safe(bot, chat_id, sticker_msg.message_id)
+    if processing_msg_id:
+        await delete_sticker_safe(bot, chat_id, processing_msg_id)
 
     # Build draft summary
     draft_text = _build_draft_text(brief_data)
