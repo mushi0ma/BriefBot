@@ -8,6 +8,7 @@ import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import { motion } from 'framer-motion';
 import { EmptyState } from '@/src/shared/ui';
+import { Search } from 'lucide-react';
 
 interface HistoryTabProps {
   briefs: Brief[];
@@ -18,6 +19,8 @@ export function HistoryTab({ briefs: initialBriefs }: HistoryTabProps) {
   const [briefs, setBriefs] = useState<Brief[]>(initialBriefs);
   const [downloading, setDownloading] = useState<"new" | "all" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
 
   const apiFetch = useCallback(
     (path: string, opts?: RequestInit) => createApiFetch(initData)(path, opts),
@@ -100,12 +103,45 @@ export function HistoryTab({ briefs: initialBriefs }: HistoryTabProps) {
     }
   };
 
-  if (briefs.length === 0) {
-    return <EmptyState />;
-  }
+  const performSearch = useCallback(async (query: string) => {
+    setIsSearching(true);
+    try {
+      const res = await apiFetch(`/api/history?query=${encodeURIComponent(query)}`);
+      if (!res.ok) throw new Error("Search failed");
+      const data = await res.json();
+      setBriefs(data.briefs || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsSearching(false);
+    }
+  }, [apiFetch]);
+
+  React.useEffect(() => {
+    const handler = setTimeout(() => {
+      performSearch(searchQuery);
+    }, 400);
+    return () => clearTimeout(handler);
+  }, [searchQuery, performSearch]);
 
   return (
     <>
+      {/* ── Search Bar ──────────────────────────────────────────── */}
+      <div className="px-4 mt-2 mb-4 animate-in">
+        <div className="relative">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <Search className="h-4 w-4 text-[var(--tg-theme-hint-color,#98989e)]" />
+          </div>
+          <input
+            type="text"
+            placeholder="Поиск брифов..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="block w-full pl-10 pr-3 py-2.5 rounded-xl border-none ring-1 ring-inset ring-[var(--tg-separator,rgba(84,84,88,0.35))] bg-[var(--tg-theme-secondary-bg-color,#2c2c2e)] text-[var(--tg-theme-text-color,#fff)] placeholder:text-[var(--tg-theme-hint-color,#98989e)] focus:ring-2 focus:ring-inset focus:ring-[var(--tg-theme-button-color,#3e88f7)] sm:text-sm sm:leading-6"
+          />
+        </div>
+      </div>
+
       {error && (
         <div className="mx-4 mb-3 px-3 py-2 rounded-xl bg-red-500/10 text-red-500 text-[13px] flex items-center gap-2 animate-in">
           <AlertCircle className="w-4 h-4 shrink-0" />
@@ -132,24 +168,36 @@ export function HistoryTab({ briefs: initialBriefs }: HistoryTabProps) {
         </button>
       </div>
 
-      <div className="flex items-center gap-2 px-4 mb-1 mt-4">
-        <Clock className="w-4 h-4 text-[var(--tg-theme-hint-color,#98989e)]" />
-        <p className="text-[12px] font-semibold uppercase tracking-wider text-[var(--tg-theme-hint-color,#98989e)]">
-          Последние брифы
-        </p>
-      </div>
-      <div className="mx-4 flex flex-col gap-2">
-        {briefs.map((b, i) => (
-          <motion.div
-            key={b.id}
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: i * 0.05, ease: 'easeOut' }}
-          >
-            <BriefRow brief={b} isLast={i === briefs.length - 1} />
-          </motion.div>
-        ))}
-      </div>
+      {briefs.length === 0 && !isSearching ? (
+        <EmptyState />
+      ) : (
+        <>
+          <div className="flex items-center gap-2 px-4 mb-1 mt-4">
+            <Clock className="w-4 h-4 text-[var(--tg-theme-hint-color,#98989e)]" />
+            <p className="text-[12px] font-semibold uppercase tracking-wider text-[var(--tg-theme-hint-color,#98989e)]">
+              Последние брифы
+            </p>
+          </div>
+          <div className="mx-4 flex flex-col gap-2">
+            {isSearching ? (
+              <div className="tg-list-item">
+                <p className="text-[14px] text-[var(--tg-theme-hint-color,#98989e)]">Поиск...</p>
+              </div>
+            ) : (
+              briefs.map((b, i) => (
+                <motion.div
+                  key={b.id}
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, delay: i * 0.05, ease: 'easeOut' }}
+                >
+                  <BriefRow brief={b} isLast={i === briefs.length - 1} />
+                </motion.div>
+              ))
+            )}
+          </div>
+        </>
+      )}
     </>
   );
 }
