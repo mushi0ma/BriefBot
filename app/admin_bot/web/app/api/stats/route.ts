@@ -1,5 +1,5 @@
 /**
- * GET /api/stats — Admin dashboard statistics endpoint.
+ * GET /api/stats — Admin dashboard statistics + recent briefs.
  * Validates Telegram initData before returning Supabase metrics.
  */
 
@@ -7,11 +7,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { validateInitData } from "@/lib/auth";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
-// Prevent static pre-rendering — env vars and DB calls are runtime-only
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
-    // 1. Extract & validate initData
     const authHeader = request.headers.get("Authorization") ?? "";
     const validated = validateInitData(authHeader);
 
@@ -25,65 +23,64 @@ export async function GET(request: NextRequest) {
     try {
         const supabase = getSupabaseAdmin();
 
-        // 2. Fetch user stats
-        const { count: totalUsers } = await supabase
-            .from("users")
-            .select("*", { count: "exact", head: true });
+        // Parallel queries for speed
+        const [
+            usersRes,
+            totalBriefsRes,
+            todayBriefsRes,
+            successBriefsRes,
+            failedBriefsRes,
+            recentBriefsRes,
+            topUsersRes,
+        ] = await Promise.all([
+            supabase.from("users").select("*", { count: "exact", head: true }),
+            supabase.from("brief_history").select("*", { count: "exact", head: true }),
+            supabase
+                .from("brief_history")
+                .select("*", { count: "exact", head: true })
+                .gte("created_at", `${new Date().toISOString().split("T")[0]}T00:00:00+00:00`),
+            supabase
+                .from("brief_history")
+                .select("*", { count: "exact", head: true })
+                .eq("processing_state", "done"),
+            supabase
+                .from("brief_history")
+                .select("*", { count: "exact", head: true })
+                .eq("processing_state", "failed"),
+            supabase
+                .from("brief_history")
+                .select("id, telegram_id, template_slug, processing_state, created_at, error_message")
+                .order("created_at", { ascending: false })
+                .limit(10),
+            supabase
+                .from("users")
+                .select("telegram_id, username, first_name, briefs_count")
+                .order("briefs_count", { ascending: false })
+                .limit(5),
+        ]);
 
-        // 3. Fetch brief stats
-        const { count: totalBriefs } = await supabase
-            .from("brief_history")
-            .select("*", { count: "exact", head: true });
-
-        const today = new Date().toISOString().split("T")[0];
-        const { count: todayBriefs } = await supabase
-            .from("brief_history")
-            .select("*", { count: "exact", head: true })
-            .gte("created_at", `${today}T00:00:00+00:00`);
-
-        const { count: successfulBriefs } = await supabase
-            .from("brief_history")
-            .select("*", { count: "exact", head: true })
-            .eq("processing_state", "done");
-
-        const { count: failedBriefs } = await supabase
-            .from("brief_history")
-            .select("*", { count: "exact", head: true })
-            .eq("processing_state", "failed");
-
-        // 4. Recent errors (last 5)
-        const { data: recentErrors } = await supabase
-            .from("brief_history")
-            .select("id, telegram_id, error_message, created_at")
-            .eq("processing_state", "failed")
-            .order("created_at", { ascending: false })
-            .limit(5);
-
-        // 5. Top users (top 5 by briefs_count)
-        const { data: topUsers } = await supabase
-            .from("users")
-            .select("telegram_id, username, first_name, briefs_count")
-            .order("briefs_count", { ascending: false })
-            .limit(5);
+        const totalUsers = usersRes.count ?? 0;
+        const totalBriefs = totalBriefsRes.count ?? 0;
+        const todayBriefs = todayBriefsRes.count ?? 0;
+        const successfulBriefs = successBriefsRes.count ?? 0;
+        const failedBriefs = failedBriefsRes.count ?? 0;
 
         const successRate =
-            totalBriefs && totalBriefs > 0
-                ? Math.round(((successfulBriefs ?? 0) / totalBriefs) * 100)
+            totalBriefs > 0
+                ? Math.round((successfulBriefs / totalBriefs) * 100)
                 : 0;
 
         return NextResponse.json({
-            users: {
-                total: totalUsers ?? 0,
-            },
+            users: { total: totalUsers },
             briefs: {
-                total: totalBriefs ?? 0,
-                today: todayBriefs ?? 0,
-                successful: successfulBriefs ?? 0,
-                failed: failedBriefs ?? 0,
+                total: totalBriefs,
+                today: todayBriefs,
+                successful: successfulBriefs,
+                failed: failedBriefs,
                 successRate,
             },
-            recentErrors: recentErrors ?? [],
-            topUsers: topUsers ?? [],
+            recentBriefs: recentBriefsRes.data ?? [],
+            topUsers: topUsersRes.data ?? [],
             timestamp: new Date().toISOString(),
         });
     } catch (err) {

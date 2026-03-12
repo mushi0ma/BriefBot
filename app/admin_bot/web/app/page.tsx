@@ -2,18 +2,19 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useTelegram } from "./TelegramProvider";
-import { 
-  Users, 
-  FileText, 
-  LayoutList, 
-  CheckCircle2, 
-  Trophy, 
-  Medal, 
-  AlertTriangle,
-  ServerCrash
+import {
+  Users,
+  FileText,
+  CalendarDays,
+  CheckCircle2,
+  XCircle,
+  TrendingUp,
+  Activity,
+  Clock,
+  ServerCrash,
 } from "lucide-react";
 
-/* ── Types ────────────────────────────────────────────────────── */
+/* ── Types ───────────────────────────────────────────────────── */
 interface StatsData {
   users: { total: number };
   briefs: {
@@ -23,11 +24,13 @@ interface StatsData {
     failed: number;
     successRate: number;
   };
-  recentErrors: Array<{
+  recentBriefs: Array<{
     id: string;
     telegram_id: number;
-    error_message: string;
+    template_slug: string;
+    processing_state: string;
     created_at: string;
+    error_message: string | null;
   }>;
   topUsers: Array<{
     telegram_id: number;
@@ -38,26 +41,52 @@ interface StatsData {
   timestamp: string;
 }
 
-/* ── Metric Row (Card style) ───────────────────────── */
-function MetricRow({
-  icon: Icon, iconBg, iconColor, label, value, detail,
+/* ── Metric Card ─────────────────────────────────────────────── */
+function MetricCard({
+  icon: Icon,
+  label,
+  value,
+  detail,
 }: {
-  icon: React.ElementType; iconBg: string; iconColor: string; label: string; value: string | number; detail?: string;
+  icon: React.ElementType;
+  label: string;
+  value: string | number;
+  detail?: string;
 }) {
   return (
-    <div className="tg-list-item">
-      <div className="tg-list-icon" style={{ backgroundColor: iconBg + "18", color: iconColor }}>
-        <Icon className="w-5 h-5" />
+    <div className="border border-[var(--border)] rounded-md bg-[var(--bg-card)] p-4 transition-all duration-200 hover:border-[var(--border-hover)]">
+      <div className="flex items-center gap-2 mb-3">
+        <Icon className="w-4 h-4 text-[var(--text-muted)]" />
+        <span className="text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">
+          {label}
+        </span>
       </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-[15px] leading-tight">{label}</p>
-        {detail && <p className="text-[13px] text-[var(--tg-theme-hint-color,#98989e)] mt-0.5">{detail}</p>}
-      </div>
-      <span className="text-[16px] font-semibold tracking-tight text-[var(--tg-theme-text-color,#fff)]">{value}</span>
+      <p className="text-2xl font-semibold tracking-tight text-[var(--text-primary)]">
+        {value}
+      </p>
+      {detail && (
+        <p className="text-xs text-[var(--text-muted)] mt-1">{detail}</p>
+      )}
     </div>
   );
 }
 
+/* ── Status Badge ────────────────────────────────────────────── */
+function StatusBadge({ state }: { state: string }) {
+  const config: Record<string, { label: string; cls: string }> = {
+    done: { label: "Done", cls: "text-[var(--success)] bg-[var(--success)]/10" },
+    failed: { label: "Error", cls: "text-[var(--destructive)] bg-[var(--destructive)]/10" },
+    processing: { label: "Processing", cls: "text-yellow-500 bg-yellow-500/10" },
+  };
+  const c = config[state] ?? { label: state, cls: "text-[var(--text-muted)] bg-white/5" };
+  return (
+    <span className={`text-[11px] font-medium px-1.5 py-0.5 rounded ${c.cls}`}>
+      {c.label}
+    </span>
+  );
+}
+
+/* ── Dashboard ───────────────────────────────────────────────── */
 export default function Dashboard() {
   const { initData, isReady } = useTelegram();
   const [stats, setStats] = useState<StatsData | null>(null);
@@ -65,18 +94,31 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null);
 
   const fetchStats = useCallback(async () => {
-    if (!initData && isReady) { setLoading(false); return; }
+    if (!initData && isReady) {
+      setLoading(false);
+      return;
+    }
     try {
-      const res = await fetch("/api/stats", { headers: { Authorization: initData } });
-      if (!res.ok) { const d = await res.json(); throw new Error(d.error || `HTTP ${res.status}`); }
+      const res = await fetch("/api/stats", {
+        headers: { Authorization: initData },
+      });
+      if (!res.ok) {
+        const d = await res.json();
+        throw new Error(d.error || `HTTP ${res.status}`);
+      }
       setStats(await res.json());
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch");
-    } finally { setLoading(false); }
+    } finally {
+      setLoading(false);
+    }
   }, [initData, isReady]);
 
-  useEffect(() => { if (isReady) fetchStats(); }, [isReady, fetchStats]);
+  useEffect(() => {
+    if (isReady) fetchStats();
+  }, [isReady, fetchStats]);
+
   useEffect(() => {
     if (!isReady) return;
     const i = setInterval(fetchStats, 30000);
@@ -86,133 +128,217 @@ export default function Dashboard() {
   if (!isReady) return null;
 
   return (
-    <main className="min-h-screen pb-8 max-w-lg mx-auto">
-      {/* ── Header ──────────────────────────────────────────────── */}
-      <div className="px-4 pt-4 pb-1">
+    <main className="min-h-screen pb-8 max-w-2xl mx-auto px-4">
+      {/* ── Header ────────────────────────────────────────────── */}
+      <div className="pt-5 pb-4 border-b border-[var(--border)]">
         <div className="flex items-center justify-between">
-          <h1 className="text-[20px] font-semibold">BriefBot Admin</h1>
+          <div>
+            <h1 className="text-base font-semibold tracking-tight">
+              BriefBot
+            </h1>
+            <p className="text-xs text-[var(--text-muted)] mt-0.5">
+              Admin Dashboard
+            </p>
+          </div>
           <div className="flex items-center gap-1.5">
-            <span className="w-[6px] h-[6px] rounded-full bg-[#30d158] animate-pulse-dot" />
-            <span className="text-[13px] text-[var(--tg-theme-hint-color,#98989e)]">Live</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-[var(--success)] animate-pulse-dot" />
+            <span className="text-[11px] text-[var(--text-muted)] font-mono">
+              live
+            </span>
           </div>
         </div>
-        <p className="text-[13px] text-[var(--tg-theme-hint-color,#98989e)] mt-0.5">Панель управления</p>
       </div>
 
-      {/* ── Error ───────────────────────────────────────────────── */}
+      {/* ── Error ─────────────────────────────────────────────── */}
       {error && (
-        <div className="mx-4 mt-3 tg-section p-3 border border-[#ff453a]/20">
-          <p className="text-[13px] text-[#ff453a]">⚠️ {error}</p>
+        <div className="mt-4 border border-[var(--destructive)]/20 rounded-md bg-[var(--destructive)]/5 px-3 py-2">
+          <p className="text-xs text-[var(--destructive)]">{error}</p>
         </div>
       )}
 
-      {/* ── No Telegram ─────────────────────────────────────────── */}
+      {/* ── No Telegram ───────────────────────────────────────── */}
       {!initData && isReady && (
-        <div className="mx-4 mt-4 bg-[var(--tg-theme-secondary-bg-color,#2c2c2e)] rounded-2xl p-8 text-center animate-in shadow-sm">
-          <ServerCrash className="w-12 h-12 mx-auto text-[var(--tg-theme-hint-color,#98989e)] mb-3 opacity-50" />
-          <p className="text-[15px] text-[var(--tg-theme-hint-color,#98989e)]">
-            Откройте через Telegram
+        <div className="mt-8 border border-[var(--border)] rounded-md bg-[var(--bg-card)] p-8 text-center animate-in">
+          <ServerCrash className="w-8 h-8 mx-auto text-[var(--text-muted)] mb-3" />
+          <p className="text-sm text-[var(--text-secondary)]">
+            Open via Telegram
           </p>
         </div>
       )}
 
-      {/* ── Loading ─────────────────────────────────────────────── */}
+      {/* ── Loading ───────────────────────────────────────────── */}
       {loading ? (
-        <div className="px-4 mt-4 space-y-3 animate-in">
-          {[1, 2, 3, 4].map(i => (
-            <div key={i} className="tg-section p-4 space-y-2">
-              <div className="skeleton h-4 w-2/3" />
-              <div className="skeleton h-3 w-1/3" />
+        <div className="mt-6 grid grid-cols-2 gap-3 animate-in">
+          {[1, 2, 3, 4].map((i) => (
+            <div
+              key={i}
+              className="border border-[var(--border)] rounded-md bg-[var(--bg-card)] p-4 space-y-3"
+            >
+              <div className="skeleton h-3 w-2/3" />
+              <div className="skeleton h-6 w-1/2" />
             </div>
           ))}
         </div>
       ) : stats ? (
         <div className="animate-in">
-          {/* ── Key Metrics ─────────────────────────────────────── */}
-          <p className="tg-section-header mt-4">Показатели</p>
-          <div className="mx-4 flex flex-col gap-2">
-            <MetricRow icon={Users} iconColor="#3e88f7" iconBg="#3e88f7" label="Пользователей" value={stats.users.total} />
-            <MetricRow icon={FileText} iconColor="#30d158" iconBg="#30d158" label="Брифов за сегодня" value={stats.briefs.today} />
-            <MetricRow icon={LayoutList} iconColor="#ff9f0a" iconBg="#ff9f0a" label="Всего брифов" value={stats.briefs.total} />
-            <MetricRow icon={CheckCircle2} iconColor="#30d158" iconBg="#30d158" label="Успешность" value={`${stats.briefs.successRate}%`} />
+          {/* ── Metrics Grid ──────────────────────────────────── */}
+          <div className="mt-6 grid grid-cols-2 gap-3">
+            <MetricCard
+              icon={Users}
+              label="Users"
+              value={stats.users.total}
+            />
+            <MetricCard
+              icon={CalendarDays}
+              label="Today"
+              value={stats.briefs.today}
+            />
+            <MetricCard
+              icon={FileText}
+              label="Total Briefs"
+              value={stats.briefs.total}
+            />
+            <MetricCard
+              icon={TrendingUp}
+              label="Success Rate"
+              value={`${stats.briefs.successRate}%`}
+            />
           </div>
 
-          {/* ── Processing Stats ────────────────────────────────── */}
-          <p className="tg-section-header mt-6">Обработка</p>
-          <div className="mx-4 bg-[var(--tg-theme-secondary-bg-color,#2c2c2e)] rounded-xl p-5 shadow-sm">
-            <div className="tg-progress-track mb-3">
+          {/* ── Processing Bar ────────────────────────────────── */}
+          <div className="mt-4 border border-[var(--border)] rounded-md bg-[var(--bg-card)] p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Activity className="w-4 h-4 text-[var(--text-muted)]" />
+                <span className="text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">
+                  Processing
+                </span>
+              </div>
+            </div>
+            <div className="h-1 rounded-sm bg-white/[0.04] overflow-hidden mb-2">
               <div
-                className="tg-progress-fill bg-[#30d158]"
-                style={{ width: `${stats.briefs.total > 0 ? (stats.briefs.successful / stats.briefs.total) * 100 : 0}%` }}
+                className="h-full rounded-sm bg-[var(--success)] transition-all duration-700"
+                style={{
+                  width: `${
+                    stats.briefs.total > 0
+                      ? (stats.briefs.successful / stats.briefs.total) * 100
+                      : 0
+                  }%`,
+                }}
               />
             </div>
-            <div className="flex justify-between text-[13px] font-medium text-[var(--tg-theme-hint-color,#98989e)]">
-              <span className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-[#30d158]" /> {stats.briefs.successful} успешных</span>
-              <span className="flex items-center gap-1.5"><AlertTriangle className="w-3.5 h-3.5 text-[#ff453a]" /> {stats.briefs.failed} ошибок</span>
+            <div className="flex justify-between text-xs text-[var(--text-muted)]">
+              <span className="flex items-center gap-1">
+                <CheckCircle2 className="w-3 h-3 text-[var(--success)]" />
+                {stats.briefs.successful} successful
+              </span>
+              <span className="flex items-center gap-1">
+                <XCircle className="w-3 h-3 text-[var(--destructive)]" />
+                {stats.briefs.failed} failed
+              </span>
             </div>
           </div>
 
-          {/* ── Top Users ───────────────────────────────────────── */}
+          {/* ── Recent Briefs Table ───────────────────────────── */}
+          {stats.recentBriefs.length > 0 && (
+            <div className="mt-6">
+              <div className="flex items-center gap-2 mb-3">
+                <Clock className="w-4 h-4 text-[var(--text-muted)]" />
+                <span className="text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">
+                  Recent Briefs
+                </span>
+              </div>
+              <div className="border border-[var(--border)] rounded-md overflow-hidden">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="border-b border-[var(--border)] bg-[var(--bg-card)]">
+                      <th className="text-[11px] font-medium text-[var(--text-muted)] uppercase tracking-wider px-3 py-2">
+                        Status
+                      </th>
+                      <th className="text-[11px] font-medium text-[var(--text-muted)] uppercase tracking-wider px-3 py-2">
+                        User
+                      </th>
+                      <th className="text-[11px] font-medium text-[var(--text-muted)] uppercase tracking-wider px-3 py-2 hidden sm:table-cell">
+                        Template
+                      </th>
+                      <th className="text-[11px] font-medium text-[var(--text-muted)] uppercase tracking-wider px-3 py-2 text-right">
+                        Date
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stats.recentBriefs.map((brief) => (
+                      <tr
+                        key={brief.id}
+                        className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--bg-hover)] transition-colors duration-150"
+                      >
+                        <td className="px-3 py-2.5">
+                          <StatusBadge state={brief.processing_state} />
+                        </td>
+                        <td className="px-3 py-2.5 text-xs font-mono text-[var(--text-secondary)]">
+                          {brief.telegram_id}
+                        </td>
+                        <td className="px-3 py-2.5 text-xs text-[var(--text-muted)] hidden sm:table-cell">
+                          {brief.template_slug || "—"}
+                        </td>
+                        <td className="px-3 py-2.5 text-xs text-[var(--text-muted)] text-right font-mono">
+                          {new Date(brief.created_at).toLocaleDateString(
+                            "ru-RU",
+                            {
+                              day: "2-digit",
+                              month: "2-digit",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            }
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* ── Top Users ─────────────────────────────────────── */}
           {stats.topUsers.length > 0 && (
-            <>
-              <p className="tg-section-header mt-6">Топ пользователей</p>
-              <div className="mx-4 flex flex-col gap-2">
+            <div className="mt-6">
+              <div className="flex items-center gap-2 mb-3">
+                <Users className="w-4 h-4 text-[var(--text-muted)]" />
+                <span className="text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">
+                  Top Users
+                </span>
+              </div>
+              <div className="border border-[var(--border)] rounded-md overflow-hidden divide-y divide-[var(--border)]">
                 {stats.topUsers.map((user, i) => (
-                  <div key={user.telegram_id} className="tg-list-item">
-                    <div className={`tg-list-icon ${
-                      i === 0 ? "bg-[#ffd60a]/10 text-[#ffd60a]" :
-                      i === 1 ? "bg-[#8e8e93]/10 text-[#8e8e93]" :
-                      i === 2 ? "bg-[#ff9f0a]/10 text-[#ff9f0a]" :
-                      "bg-[var(--tg-theme-button-color,#3e88f7)]/10 text-[var(--tg-theme-button-color,#3e88f7)]"
-                    }`}>
-                      {i === 0 ? <Trophy className="w-5 h-5" /> : 
-                       i <= 2 ? <Medal className="w-5 h-5" /> : 
-                       <span className="text-[14px] font-bold">{i + 1}</span>}
+                  <div
+                    key={user.telegram_id}
+                    className="flex items-center justify-between px-3 py-2.5 hover:bg-[var(--bg-hover)] transition-colors duration-150"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-[11px] font-mono text-[var(--text-muted)] w-4 text-right">
+                        {i + 1}
+                      </span>
+                      <span className="text-sm text-[var(--text-primary)]">
+                        {user.username
+                          ? `@${user.username}`
+                          : user.first_name || `ID:${user.telegram_id}`}
+                      </span>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[15px] font-medium truncate text-[var(--tg-theme-text-color,#fff)]">
-                        {user.username ? `@${user.username}` : user.first_name || `ID:${user.telegram_id}`}
-                      </p>
-                    </div>
-                    <span className="text-[15px] font-semibold text-[var(--tg-theme-hint-color,#98989e)] font-mono">
+                    <span className="text-xs font-mono text-[var(--text-muted)]">
                       {user.briefs_count}
                     </span>
                   </div>
                 ))}
               </div>
-            </>
+            </div>
           )}
 
-          {/* ── Recent Errors ───────────────────────────────────── */}
-          {stats.recentErrors.length > 0 && (
-            <>
-              <p className="tg-section-header mt-6">Последние ошибки</p>
-              <div className="mx-4 flex flex-col gap-2">
-                {stats.recentErrors.map((err) => (
-                  <div key={err.id} className="tg-list-item flex-col !items-stretch !gap-3 !py-3">
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center gap-2">
-                        <AlertTriangle className="w-4 h-4 text-[#ff453a]" />
-                        <span className="text-[13px] font-medium text-[var(--tg-theme-hint-color,#98989e)]">
-                          User {err.telegram_id}
-                        </span>
-                      </div>
-                      <span className="text-[12px] font-medium text-[var(--tg-theme-hint-color,#98989e)]/70">
-                        {new Date(err.created_at).toLocaleString("ru-RU", {
-                          hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit",
-                        })}
-                      </span>
-                    </div>
-                    <p className="text-[14px] text-[#ff453a]/90 break-words leading-relaxed">{err.error_message}</p>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-
-          {/* ── Footer ──────────────────────────────────────────── */}
-          <p className="text-center text-[11px] text-[var(--tg-theme-hint-color,#98989e)] mt-6 px-4">
-            Обновлено: {new Date(stats.timestamp).toLocaleTimeString("ru-RU")} · обновление каждые 30с
+          {/* ── Footer ────────────────────────────────────────── */}
+          <p className="text-center text-[10px] text-[var(--text-muted)] mt-6 font-mono">
+            Updated{" "}
+            {new Date(stats.timestamp).toLocaleTimeString("ru-RU")} ·
+            refreshes every 30s
           </p>
         </div>
       ) : null}
