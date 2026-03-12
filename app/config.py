@@ -62,20 +62,19 @@ class Settings(BaseSettings):
     tma_user_url: str = "https://your-user-tma.vercel.app"
     admin_web_port: int = 8080
 
-    # ── Telegram Stickers ────────────────────
-    sticker_hello_id: str = ""
-    sticker_think_id: str = ""
-    sticker_success_id: str = ""
-    sticker_okay_id: str = ""
-    sticker_ask_id: str = ""
+    # ── Telegram Stickers (Epic 3: UX Analytics) ─────────────
+    sticker_onboarding_id: str = ""        # /start greeting
+    sticker_processing_id: str = ""        # Loading / thinking
+    sticker_missing_fields_id: str = ""    # Magnifying glass / notepad
+    sticker_success_id: str = ""           # Approved / checkmark
+    sticker_error_id: str = ""             # Error / failed STT
+
+    # Admin specific stickers
     sticker_stats_id: str = ""
     sticker_health_check_healthy_id: str = ""
     sticker_health_check_errors_id: str = ""
-    sticker_processing_id: str = ""
-    sticker_error_id: str = ""
     sticker_welcome_admin_id: str = ""
     sticker_notification_id: str = ""
-
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:

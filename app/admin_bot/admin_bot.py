@@ -456,7 +456,7 @@ async def cmd_broadcast(message: Message) -> None:
         reply_markup=broadcast_confirm_keyboard(),
         parse_mode="Markdown",
     )
-    await _send_sticker(message, settings.sticker_ask_id)
+    await _send_sticker(message, settings.sticker_missing_fields_id)
 
 
 @router.callback_query(F.data == "broadcast:confirm")

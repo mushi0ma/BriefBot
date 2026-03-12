@@ -32,6 +32,13 @@ async def _send_result_to_user(chat_id: int, result: ProcessingResult):
 
     try:
         if result.state == ProcessingState.DONE and result.pdf_path:
+            # Send Success Sticker
+            if settings.sticker_success_id:
+                try:
+                    await bot.send_sticker(chat_id, settings.sticker_success_id)
+                except Exception as e:
+                    logger.warning("sticker_send_failed", sticker_id=settings.sticker_success_id, error=str(e))
+
             # Send Summary
             summary_text = (
                 "*Бриф готов!*\n\n"
@@ -51,6 +58,13 @@ async def _send_result_to_user(chat_id: int, result: ProcessingResult):
                 reply_markup=feedback_keyboard()
             )
         else:
+            # Send Error Sticker
+            if settings.sticker_error_id:
+                try:
+                    await bot.send_sticker(chat_id, settings.sticker_error_id)
+                except Exception as e:
+                    logger.warning("sticker_send_failed", sticker_id=settings.sticker_error_id, error=str(e))
+
             error_text = result.error_message or "Произошла ошибка при обработке. Попробуйте ещё раз."
             await bot.send_message(chat_id, error_text)
     finally:
@@ -92,6 +106,18 @@ async def _send_draft_to_user(chat_id: int, telegram_id: int, template_slug: str
 
             # Update FSM State
             key = StorageKey(bot_id=bot.id, chat_id=chat_id, user_id=telegram_id)
+            
+            # Fetch existing data to get the processing sticker msg ID
+            context_data = await storage.get_data(key)
+            processing_sticker_msg_id = context_data.get("processing_sticker_msg_id") if context_data else None
+
+            # Delete processing sticker if we had one
+            if processing_sticker_msg_id:
+                try:
+                    await bot.delete_message(chat_id, processing_sticker_msg_id)
+                except Exception as e:
+                    logger.warning("failed_to_delete_processing_sticker", msg_id=processing_sticker_msg_id, error=str(e))
+
             await storage.set_state(key, BriefState.reviewing_draft)
             await storage.set_data(key, {
                 "brief_data": brief_data.model_dump(),
@@ -105,6 +131,11 @@ async def _send_draft_to_user(chat_id: int, telegram_id: int, template_slug: str
                 await bot.send_message(chat_id, draft_text, parse_mode="Markdown")
                 # Client assessment removed per user request
                 # Ask about missing info
+                if settings.sticker_missing_fields_id:
+                     try:
+                         await bot.send_sticker(chat_id, settings.sticker_missing_fields_id)
+                     except Exception as e:
+                         logger.warning("sticker_send_failed", sticker_id=settings.sticker_missing_fields_id, error=str(e))
                 await bot.send_message(
                     chat_id,
                     f"💡 *Я заметил, что не хватает информации:*\n\n"
@@ -124,6 +155,24 @@ async def _send_draft_to_user(chat_id: int, telegram_id: int, template_slug: str
                 # Client assessment removed per user request
 
         else:
+            # Also cleanup processing sticker on failure if state permits
+            key = StorageKey(bot_id=bot.id, chat_id=chat_id, user_id=telegram_id)
+            context_data = await storage.get_data(key)
+            if context_data and context_data.get("processing_sticker_msg_id"):
+                try:
+                    await bot.delete_message(chat_id, context_data["processing_sticker_msg_id"])
+                    # clean up the id as well
+                    context_data.pop("processing_sticker_msg_id")
+                    await storage.set_data(key, context_data)
+                except Exception as e:
+                    logger.warning("failed_to_delete_processing_sticker_on_error", error=str(e))
+
+            if settings.sticker_error_id:
+                try:
+                    await bot.send_sticker(chat_id, settings.sticker_error_id)
+                except Exception as e:
+                    logger.warning("sticker_send_failed", sticker_id=settings.sticker_error_id, error=str(e))
+
             error_text = result.error_message or "Ошибка анализа аудио. Попробуйте ещё раз."
             await bot.send_message(chat_id, error_text)
     finally:

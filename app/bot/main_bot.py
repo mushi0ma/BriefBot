@@ -50,17 +50,18 @@ router = Router()
 _user_templates: dict[int, str] = {}
 
 
-async def _send_sticker(target: Message | Bot, chat_id: int, sticker_id: str) -> None:
-    """Safely send a sticker. No-op if sticker_id is empty."""
+async def _send_sticker(target: Message | Bot, chat_id: int, sticker_id: str) -> Message | None:
+    """Safely send a sticker. No-op if sticker_id is empty. Returns the Message object if sent."""
     if not sticker_id:
-        return
+        return None
     try:
         if isinstance(target, Bot):
-            await target.send_sticker(chat_id, sticker_id)
+            return await target.send_sticker(chat_id, sticker_id)
         else:
-            await target.answer_sticker(sticker_id)
+            return await target.answer_sticker(sticker_id)
     except Exception as e:
         logger.warning("sticker_send_failed", sticker_id=sticker_id, error=str(e))
+        return None
 
 
 def _escape_md2(text: str) -> str:
@@ -95,7 +96,7 @@ async def cmd_start(message: Message, state: FSMContext) -> None:
         reply_markup=main_menu_keyboard(),
         parse_mode="Markdown",
     )
-    await _send_sticker(message, message.chat.id, settings.sticker_hello_id)
+    await _send_sticker(message, message.chat.id, settings.sticker_onboarding_id)
 
 
 # ── Menu Callbacks (SPA Navigation) ──────────────────────────────────────────
@@ -394,8 +395,11 @@ async def handle_voice(message: Message, bot: Bot, state: FSMContext) -> None:
         file_id=file_id,
     )
 
-    # Send "thinking" sticker + "processing" status with cancel button (Feature 6)
-    await _send_sticker(message, chat_id, settings.sticker_think_id)
+    # Send "processing" sticker + "processing" status with cancel button (Feature 6)
+    sticker_msg = await _send_sticker(message, chat_id, settings.sticker_processing_id)
+    if sticker_msg:
+        await state.update_data(processing_sticker_msg_id=sticker_msg.message_id)
+
     await message.answer(
         "🎙 *Аудио получено\.\.\.*\n\n"
         f"Шаблон: {_escape_md2(template_slug)}\n"
@@ -467,7 +471,7 @@ async def handle_draft_edit(message: Message, state: FSMContext, bot: Bot) -> No
     )
     await state.set_state(BriefState.reviewing_draft)
 
-    await _send_sticker(message, message.chat.id, get_settings().sticker_okay_id)
+    await _send_sticker(message, message.chat.id, get_settings().sticker_success_id)
     await message.answer(
         draft_text,
         reply_markup=draft_review_keyboard(),
@@ -619,7 +623,10 @@ async def on_generate_brief(callback: CallbackQuery, state: FSMContext, bot: Bot
     await callback.answer("Анализирую текст...")
 
     settings = get_settings()
-    await _send_sticker(bot, chat_id, settings.sticker_think_id)
+    sticker_msg = await _send_sticker(bot, chat_id, settings.sticker_processing_id)
+    if sticker_msg:
+        await state.update_data(processing_sticker_msg_id=sticker_msg.message_id)
+
     await callback.message.edit_text(
         "*Анализирую текст\.\.\.*\n\n"
         f"Шаблон: {_escape_md2(template_slug)}\n"
@@ -662,7 +669,7 @@ async def on_generate_brief(callback: CallbackQuery, state: FSMContext, bot: Bot
         # Client assessment removed per user request
 
         # Ask about missing info
-        await _send_sticker(bot, chat_id, settings.sticker_ask_id)
+        await _send_sticker(bot, chat_id, settings.sticker_missing_fields_id)
         await bot.send_message(
             chat_id,
             f"💡 *Я заметил, что не хватает информации:*\n\n"
@@ -671,7 +678,6 @@ async def on_generate_brief(callback: CallbackQuery, state: FSMContext, bot: Bot
             reply_markup=missing_info_keyboard(),
             parse_mode="MarkdownV2",
         )
-        await _send_sticker(bot, chat_id, settings.sticker_ask_id)
     else:
         await bot.send_message(
             chat_id,
@@ -695,7 +701,7 @@ async def on_fill_missing_info(callback: CallbackQuery, state: FSMContext) -> No
     await state.update_data(missing_field=missing)
 
     await callback.answer()
-    await _send_sticker(callback.message, callback.message.chat.id, get_settings().sticker_ask_id)
+    await _send_sticker(callback.message, callback.message.chat.id, get_settings().sticker_missing_fields_id)
     parts = [f"✍ *Введите недостающую информацию:*\n"]
     for line in missing.split('\n'):
         parts.append(f"_{_escape_md2(line)}_")
@@ -711,7 +717,7 @@ async def on_fill_missing_info(callback: CallbackQuery, state: FSMContext) -> No
 async def on_skip_missing_info(callback: CallbackQuery, state: FSMContext) -> None:
     """Skip missing info and proceed to PDF generation options."""
     await callback.answer()
-    await _send_sticker(callback.message, callback.message.chat.id, get_settings().sticker_okay_id)
+    await _send_sticker(callback.message, callback.message.chat.id, get_settings().sticker_success_id)
     await callback.message.edit_text(
         "⏭ Пропускаем недостающую информацию\.\n\n"
         "Выберите действие:",
