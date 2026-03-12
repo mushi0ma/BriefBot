@@ -4,5 +4,11 @@
   ],
   "search_path": [
     ".venv/lib/python3.14/site-packages"
+  ],
+  "exclude": [
+    ".venv/.*",
+    ".pytest_cache/.*",
+    ".ruff_cache/.*",
+    "node_modules/.*"
   ]
 }
