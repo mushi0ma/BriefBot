@@ -7,6 +7,7 @@ export const dynamic = "force-dynamic";
 /**
  * GET /api/history — returns the authenticated user's brief history.
  * Validates initData, extracts user.id, and queries only that user's records.
+ * Supports an optional ?query= parameter to search by title or template_slug.
  */
 export async function GET(request: Request) {
     try {
@@ -18,11 +19,23 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
+        const url = new URL(request.url);
+        const query = url.searchParams.get("query") || "";
+
         const sb = getSupabaseAdmin();
-        const { data, error } = await sb
+        let qb = sb
             .from("brief_history")
             .select("id, template_slug, processing_state, brief_data, pdf_url, processing_time_ms, created_at, title, is_downloaded")
-            .eq("telegram_id", user.id)
+            .eq("telegram_id", user.id);
+
+        if (query) {
+            // Search by title or template_slug (using ILIKE for case-insensitive search in Supabase text columns)
+            // Escape quotes, commas, parentheses for PostgREST to prevent injection
+            const safeQuery = query.replace(/[,"()]/g, "");
+            qb = qb.or(`title.ilike.%${safeQuery}%,template_slug.ilike.%${safeQuery}%`);
+        }
+
+        const { data, error } = await qb
             .order("created_at", { ascending: false })
             .limit(50);
 
