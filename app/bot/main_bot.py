@@ -474,12 +474,7 @@ async def handle_draft_edit(message: Message, state: FSMContext, bot: Bot) -> No
         parse_mode="MarkdownV2",
     )
 
-    # Show client assessment
-    if brief_data.client_assessment:
-        await message.answer(
-            f"🔍 *Оценка клиента (для вас):*\n\n{brief_data.client_assessment}",
-            parse_mode="Markdown",
-        )
+    # Client assessment removed per user request
 
 
 # ── Text: Missing Info Handler (Feature 7) ──────────────────────────────────
@@ -602,10 +597,6 @@ async def handle_text(message: Message, state: FSMContext) -> None:
         reply_markup=generate_brief_keyboard(),
         parse_mode="Markdown",
     )
-    
-    settings = get_settings()
-    await _send_sticker(message, message.chat.id, settings.sticker_think_id)
-
 
 # ── Generate Brief Callback (Text Flow) → Draft Mode ────────────────────────
 @router.callback_query(F.data == "generate_brief")
@@ -668,13 +659,7 @@ async def on_generate_brief(callback: CallbackQuery, state: FSMContext, bot: Bot
             parse_mode="MarkdownV2",
         )
 
-        # Show client assessment
-        if brief_data.client_assessment:
-            await bot.send_message(
-                chat_id,
-                f"🔍 *Оценка клиента \(для вас\):*\n\n{_escape_md2(brief_data.client_assessment)}",
-                parse_mode="MarkdownV2",
-            )
+        # Client assessment removed per user request
 
         # Ask about missing info
         await _send_sticker(bot, chat_id, settings.sticker_ask_id)
@@ -695,13 +680,7 @@ async def on_generate_brief(callback: CallbackQuery, state: FSMContext, bot: Bot
             parse_mode="MarkdownV2",
         )
 
-        # Show client assessment
-        if brief_data.client_assessment:
-            await bot.send_message(
-                chat_id,
-                f"🔍 *Оценка клиента (для вас):*\n\n{brief_data.client_assessment}",
-                parse_mode="Markdown",
-            )
+        # Client assessment removed per user request
 
 
 # ── Missing Info Callbacks (Feature 7) ──────────────────────────────────────
@@ -804,13 +783,7 @@ async def on_draft_generate_pdf(callback: CallbackQuery, state: FSMContext, bot:
         )
         await bot.send_message(chat_id, summary_text, parse_mode="MarkdownV2")
 
-        # Show client assessment (Telegram only, not in PDF)
-        if result.brief_data.client_assessment:
-            await bot.send_message(
-                chat_id,
-                f"🔍 *Оценка клиента \(для вас\):*\n\n{_escape_md2(result.brief_data.client_assessment)}",
-                parse_mode="MarkdownV2",
-            )
+        # Client assessment removed per user request
 
         pdf_file = FSInputFile(result.pdf_path)
         await bot.send_document(
@@ -978,11 +951,7 @@ def _build_draft_text(brief_data) -> str:
     for section in brief_data.extra_sections:
         _field(section.title, section.value)
 
-    if brief_data.missing_info:
-        parts.append(f"\n⚠️ *Нехватающая информация:*")
-        for line in brief_data.missing_info.split('\n'):
-            parts.append(f"> _{_escape_md2(line)}_")
-        parts.append(f"\n_Напишите уточнения или нажмите «Сгенерировать PDF»\._")
+    # Missing info is sent as a separated message
 
     parts.append("\nПроверьте данные и выберите действие:")
 

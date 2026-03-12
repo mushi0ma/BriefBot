@@ -79,9 +79,10 @@ def admin_main_keyboard() -> ReplyKeyboardMarkup:
     )
 
 
-# ── /start ───────────────────────────────────────────────────────────────────
+# ── /start & /help ───────────────────────────────────────────────────────────
 @router.message(CommandStart())
-async def cmd_start(message: Message) -> None:
+@router.message(Command("help"))
+async def cmd_start_help(message: Message) -> None:
     if not _is_admin(message):
         await message.answer("⛔ Доступ запрещён.")
         return
@@ -89,6 +90,7 @@ async def cmd_start(message: Message) -> None:
     await message.answer(
         "🛠 *BriefBot Admin Panel*\n\n"
         "Доступные команды:\n"
+        "/help — список команд (эта справка)\n"
         "/stats — статистика\n"
         "/health — проверка сервисов\n"
         "/users — топ пользователей\n"

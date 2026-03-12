@@ -40,13 +40,7 @@ async def _send_result_to_user(chat_id: int, result: ProcessingResult):
             )
             await bot.send_message(chat_id, summary_text, parse_mode="Markdown")
 
-            # Show client assessment (Telegram only, not in PDF)
-            if result.brief_data.client_assessment:
-                await bot.send_message(
-                    chat_id,
-                    f"🔍 *Оценка клиента (для вас):*\n\n{result.brief_data.client_assessment}",
-                    parse_mode="Markdown",
-                )
+            # Client assessment removed per user request
 
             # Send PDF
             pdf_file = FSInputFile(result.pdf_path)
@@ -78,11 +72,7 @@ def _build_draft_text(brief_data: BriefData) -> str:
     if brief_data.wishes:
         parts.append(f"*Пожелания:* {brief_data.wishes}")
 
-    if brief_data.missing_info:
-        parts.append(
-            f"\n⚠️ *Нехватающая информация:*\n{brief_data.missing_info}\n"
-            "_Напишите уточнения или нажмите «Сгенерировать PDF»._"
-        )
+    # Missing info is sent as a separated message
 
     parts.append("\nПроверьте данные и выберите действие:")
 
@@ -113,13 +103,7 @@ async def _send_draft_to_user(chat_id: int, telegram_id: int, template_slug: str
             # Feature 7: Missing Info Prompt
             if brief_data.missing_info:
                 await bot.send_message(chat_id, draft_text, parse_mode="Markdown")
-                # Show client assessment
-                if brief_data.client_assessment:
-                    await bot.send_message(
-                        chat_id,
-                        f"🔍 *Оценка клиента (для вас):*\n\n{brief_data.client_assessment}",
-                        parse_mode="Markdown",
-                    )
+                # Client assessment removed per user request
                 # Ask about missing info
                 await bot.send_message(
                     chat_id,
@@ -137,13 +121,7 @@ async def _send_draft_to_user(chat_id: int, telegram_id: int, template_slug: str
                     parse_mode="Markdown",
                 )
                 
-                # Show client assessment
-                if brief_data.client_assessment:
-                    await bot.send_message(
-                        chat_id,
-                        f"🔍 *Оценка клиента (для вас):*\n\n{brief_data.client_assessment}",
-                        parse_mode="Markdown",
-                    )
+                # Client assessment removed per user request
 
         else:
             error_text = result.error_message or "Ошибка анализа аудио. Попробуйте ещё раз."
