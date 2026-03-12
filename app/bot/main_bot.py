@@ -385,6 +385,13 @@ async def handle_voice(message: Message, bot: Bot, state: FSMContext) -> None:
         await message.answer("Не удалось скачать аудио. Попробуйте ещё раз.")
         return
 
+    # Send "processing" sticker FIRST so we capture its ID
+    sticker_msg = await _send_sticker(message, chat_id, settings.sticker_processing_id)
+    processing_msg_id = sticker_msg.message_id if sticker_msg else None
+
+    if processing_msg_id:
+        await state.update_data(processing_sticker_msg_id=processing_msg_id)
+
     # Dispatch Celery task
     task = task_analyze_request.delay(
         chat_id=chat_id,
@@ -393,12 +400,8 @@ async def handle_voice(message: Message, bot: Bot, state: FSMContext) -> None:
         template_slug=template_slug,
         username=user.username,
         file_id=file_id,
+        processing_msg_id=processing_msg_id,
     )
-
-    # Send "processing" sticker + "processing" status with cancel button (Feature 6)
-    sticker_msg = await _send_sticker(message, chat_id, settings.sticker_processing_id)
-    if sticker_msg:
-        await state.update_data(processing_sticker_msg_id=sticker_msg.message_id)
 
     await message.answer(
         "🎙 *Аудио получено\.\.\.*\n\n"
@@ -414,13 +417,23 @@ async def handle_voice(message: Message, bot: Bot, state: FSMContext) -> None:
 
 # ── Cancel Celery Task (Feature 6) ──────────────────────────────────────────
 @router.callback_query(F.data.startswith("cancel:"))
-async def on_cancel_task(callback: CallbackQuery) -> None:
+async def on_cancel_task(callback: CallbackQuery, bot: Bot, state: FSMContext) -> None:
     """Cancel a running Celery task."""
     task_id = callback.data.split(":", 1)[1]
 
     try:
         from app.worker.celery_app import celery_app
         celery_app.control.revoke(task_id, terminate=True)
+        
+        # Cleanup the processing sticker if possible
+        data = await state.get_data()
+        processing_msg_id = data.get("processing_sticker_msg_id")
+        if processing_msg_id:
+            try:
+                await bot.delete_message(callback.message.chat.id, processing_msg_id)
+            except Exception:
+                pass
+
         await callback.answer("Задача отменена.")
         await callback.message.edit_text(
             "❌ *Обработка отменена.*\n\n"
@@ -624,8 +637,6 @@ async def on_generate_brief(callback: CallbackQuery, state: FSMContext, bot: Bot
 
     settings = get_settings()
     sticker_msg = await _send_sticker(bot, chat_id, settings.sticker_processing_id)
-    if sticker_msg:
-        await state.update_data(processing_sticker_msg_id=sticker_msg.message_id)
 
     await callback.message.edit_text(
         "*Анализирую текст\.\.\.*\n\n"
@@ -644,7 +655,19 @@ async def on_generate_brief(callback: CallbackQuery, state: FSMContext, bot: Bot
     except Exception as e:
         logger.error("draft_generation_failed", error=str(e), user_id=user_id)
         await bot.send_message(chat_id, "Произошла ошибка при анализе текста. Попробуйте ещё раз.")
+        if sticker_msg:
+            try:
+                await bot.delete_message(chat_id, sticker_msg.message_id)
+            except Exception as e2:
+                logger.warning("failed_to_delete_sticker_on_generate", error=str(e2))
         return
+
+    # Delete processing sticker on success
+    if sticker_msg:
+        try:
+            await bot.delete_message(chat_id, sticker_msg.message_id)
+        except Exception as e:
+            logger.warning("failed_to_delete_sticker_on_generate", error=str(e))
 
     # Build draft summary
     draft_text = _build_draft_text(brief_data)

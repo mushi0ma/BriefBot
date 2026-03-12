@@ -93,7 +93,7 @@ def _build_draft_text(brief_data: BriefData) -> str:
     return "\n".join(parts)
 
 
-async def _send_draft_to_user(chat_id: int, telegram_id: int, template_slug: str, username: str | None, result: ProcessingResult):
+async def _send_draft_to_user(chat_id: int, telegram_id: int, template_slug: str, username: str | None, result: ProcessingResult, processing_msg_id: int | None = None):
     """Sends the interactive draft back to the user and updates FSM."""
     settings = get_settings()
     bot = Bot(token=settings.telegram_bot_token.get_secret_value())
@@ -106,17 +106,13 @@ async def _send_draft_to_user(chat_id: int, telegram_id: int, template_slug: str
 
             # Update FSM State
             key = StorageKey(bot_id=bot.id, chat_id=chat_id, user_id=telegram_id)
-            
-            # Fetch existing data to get the processing sticker msg ID
-            context_data = await storage.get_data(key)
-            processing_sticker_msg_id = context_data.get("processing_sticker_msg_id") if context_data else None
 
             # Delete processing sticker if we had one
-            if processing_sticker_msg_id:
+            if processing_msg_id:
                 try:
-                    await bot.delete_message(chat_id, processing_sticker_msg_id)
+                    await bot.delete_message(chat_id, processing_msg_id)
                 except Exception as e:
-                    logger.warning("failed_to_delete_processing_sticker", msg_id=processing_sticker_msg_id, error=str(e))
+                    logger.warning("failed_to_delete_processing_sticker", msg_id=processing_msg_id, error=str(e))
 
             await storage.set_state(key, BriefState.reviewing_draft)
             await storage.set_data(key, {
@@ -156,14 +152,9 @@ async def _send_draft_to_user(chat_id: int, telegram_id: int, template_slug: str
 
         else:
             # Also cleanup processing sticker on failure if state permits
-            key = StorageKey(bot_id=bot.id, chat_id=chat_id, user_id=telegram_id)
-            context_data = await storage.get_data(key)
-            if context_data and context_data.get("processing_sticker_msg_id"):
+            if processing_msg_id:
                 try:
-                    await bot.delete_message(chat_id, context_data["processing_sticker_msg_id"])
-                    # clean up the id as well
-                    context_data.pop("processing_sticker_msg_id")
-                    await storage.set_data(key, context_data)
+                    await bot.delete_message(chat_id, processing_msg_id)
                 except Exception as e:
                     logger.warning("failed_to_delete_processing_sticker_on_error", error=str(e))
 
@@ -186,7 +177,7 @@ async def _send_draft_to_user(chat_id: int, telegram_id: int, template_slug: str
     max_retries=3,
     queue="briefbot"
 )
-def task_analyze_request(self, chat_id: int, telegram_id: int, audio_path: str, template_slug: str, username: str | None = None, file_id: str | None = None) -> dict:
+def task_analyze_request(self, chat_id: int, telegram_id: int, audio_path: str, template_slug: str, username: str | None = None, file_id: str | None = None, processing_msg_id: int | None = None) -> dict:
     """
     Celery task to run the BriefBot pipeline for audio up to Draft generation.
     Returns serialized BriefData if successful.
@@ -208,7 +199,7 @@ def task_analyze_request(self, chat_id: int, telegram_id: int, audio_path: str, 
         ))
         
         # Send interactive draft back to telegram
-        loop.run_until_complete(_send_draft_to_user(chat_id, telegram_id, template_slug, username, result))
+        loop.run_until_complete(_send_draft_to_user(chat_id, telegram_id, template_slug, username, result, processing_msg_id))
 
         loop.close()
 

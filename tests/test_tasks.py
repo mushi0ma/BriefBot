@@ -47,7 +47,8 @@ def test_task_analyze_request_success(mock_orchestrator, sample_brief_data):
             chat_id=123,
             telegram_id=456,
             audio_path="/tmp/audio.ogg",
-            template_slug="default"
+            template_slug="default",
+            processing_msg_id=777
         )
         
         # Verify
@@ -72,7 +73,8 @@ def test_task_analyze_request_failure(mock_orchestrator):
                 chat_id=123,
                 telegram_id=456,
                 audio_path="/tmp/audio.ogg",
-                template_slug="default"
+                template_slug="default",
+                processing_msg_id=777
             )
 
 def test_task_generate_pdf_success(mock_orchestrator, sample_brief_data):
