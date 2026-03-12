@@ -13,7 +13,7 @@ export function TemplatesTab({ selected, onSelect, saving }: TemplatesTabProps) 
   return (
     <>
       <p className="tg-section-header">Шаблон по умолчанию</p>
-      <div className="mx-4 tg-section">
+      <div className="mx-4 flex flex-col gap-2">
         <TemplatePicker
           templates={TEMPLATES}
           selected={selected}

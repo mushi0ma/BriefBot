@@ -150,7 +150,7 @@ export function HistoryTab({ briefs: initialBriefs }: HistoryTabProps) {
           Последние брифы
         </p>
       </div>
-      <div className="mx-4 tg-section rounded-xl">
+      <div className="mx-4 flex flex-col gap-2">
         {briefs.map((b, i) => (
           <BriefRow key={b.id} brief={b} isLast={i === briefs.length - 1} />
         ))}

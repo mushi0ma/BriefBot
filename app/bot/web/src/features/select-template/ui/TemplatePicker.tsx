@@ -29,20 +29,22 @@ export function TemplatePicker({ templates, selected, onSelect, disabled }: Temp
             key={t.slug}
             onClick={() => onSelect(t.slug)}
             disabled={disabled}
-            className={`tg-list-item w-full text-left transition-all duration-200 ${
-              i > 0 ? "border-t border-[var(--tg-separator)] !ml-0 !pl-4" : ""
-            } ${isSelected ? "bg-[var(--tg-theme-button-color,#3e88f7)]/5" : "hover:bg-[var(--tg-theme-secondary-bg-color,#2c2c2e)]/50"}`}
+            className={`tg-list-item w-full text-left outline-none ${
+              isSelected 
+                ? "ring-2 ring-inset ring-[var(--tg-theme-button-color,#3e88f7)] bg-[var(--tg-theme-button-color,#3e88f7)]/5" 
+                : "hover:bg-[var(--tg-theme-bg-color,#1c1c1e)] hover:shadow-sm"
+            }`}
           >
-            <div className={`tg-list-icon rounded-xl transition-colors duration-200 ${
+            <div className={`tg-list-icon transition-colors duration-200 ${
               isSelected
-                ? "bg-[var(--tg-theme-button-color,#3e88f7)] text-white"
-                : "bg-[var(--tg-theme-button-color,#3e88f7)]/10 text-[var(--tg-theme-button-color,#3e88f7)]"
+                ? "bg-[var(--tg-theme-button-color,#3e88f7)] text-white shadow-md shadow-[var(--tg-theme-button-color,#3e88f7)]/20"
+                : "bg-[var(--tg-theme-secondary-bg-color,#2c2c2e)] text-[var(--tg-theme-button-color,#3e88f7)]"
             }`}>
               <Icon className="w-5 h-5" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-[15px]">{t.name}</p>
-              <p className="text-[13px] text-[var(--tg-theme-hint-color,#98989e)]">{t.desc}</p>
+              <p className="text-[15px] font-medium text-[var(--tg-theme-text-color,#fff)]">{t.name}</p>
+              <p className="text-[13px] leading-relaxed text-[var(--tg-theme-hint-color,#98989e)] mt-0.5">{t.desc}</p>
             </div>
             {isSelected ? (
               <Check className="w-5 h-5 text-[var(--tg-theme-button-color,#3e88f7)]" strokeWidth={3} />
