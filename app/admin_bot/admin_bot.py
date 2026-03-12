@@ -57,7 +57,7 @@ _pending_broadcasts: dict[int, str] = {}
 def _is_admin(message: Message) -> bool:
     """Check if the sender is the authorized admin."""
     settings = get_settings()
-    return message.from_user and message.from_user.id == settings.admin_chat_id
+    return message.from_user and message.from_user.id in settings.admin_ids
 
 
 def admin_main_keyboard() -> ReplyKeyboardMarkup:

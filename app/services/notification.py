@@ -67,18 +67,19 @@ async def notify_admin(
 
     try:
         url = f"https://api.telegram.org/bot{settings.telegram_admin_bot_token.get_secret_value()}/sendMessage"
-        payload = {
-            "chat_id": settings.admin_chat_id,
-            "text": text,
-            "parse_mode": "Markdown",
-        }
 
         async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.post(url, json=payload)
-            if response.status_code != 200:
-                logger.error("admin_notify_http_error", status=response.status_code, body=response.text)
-            else:
-                logger.debug("admin_notified", severity=severity.value)
+            for admin_id in settings.admin_ids:
+                payload = {
+                    "chat_id": admin_id,
+                    "text": text,
+                    "parse_mode": "Markdown",
+                }
+                response = await client.post(url, json=payload)
+                if response.status_code != 200:
+                    logger.error("admin_notify_http_error", status=response.status_code, body=response.text)
+                else:
+                    logger.debug("admin_notified", severity=severity.value)
 
     except Exception as e:
         # Never crash because of notification failure
@@ -105,18 +106,19 @@ async def notify_admin_new_brief(pdf_url: str, brief_data: BriefData, user_info:
     
     try:
         url = f"https://api.telegram.org/bot{settings.telegram_admin_bot_token.get_secret_value()}/sendMessage"
-        payload = {
-            "chat_id": settings.admin_chat_id,
-            "text": text,
-            "parse_mode": "Markdown",
-            "disable_web_page_preview": True,
-        }
 
         async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.post(url, json=payload)
-            if response.status_code != 200:
-                logger.error("admin_notify_new_brief_http_error", status=response.status_code, body=response.text)
-            else:
-                logger.info("admin_notified_new_brief", user_info=user_info)
+            for admin_id in settings.admin_ids:
+                payload = {
+                    "chat_id": admin_id,
+                    "text": text,
+                    "parse_mode": "Markdown",
+                    "disable_web_page_preview": True,
+                }
+                response = await client.post(url, json=payload)
+                if response.status_code != 200:
+                    logger.error("admin_notify_new_brief_http_error", status=response.status_code, body=response.text)
+                else:
+                    logger.info("admin_notified_new_brief", user_info=user_info)
     except Exception as e:
         logger.error("admin_notify_new_brief_failed", error=str(e), user_info=user_info)

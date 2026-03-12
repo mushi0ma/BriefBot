@@ -25,7 +25,11 @@ class Settings(BaseSettings):
     # ── Telegram ─────────────────────────────
     telegram_bot_token: SecretStr
     telegram_admin_bot_token: SecretStr
-    admin_chat_id: int
+    admin_chat_ids: str  # comma-separated list of admin IDs
+
+    @property
+    def admin_ids(self) -> list[int]:
+        return [int(x.strip()) for x in self.admin_chat_ids.split(",") if x.strip()]
 
     # ── AI APIs ──────────────────────────────
     openai_api_key: SecretStr | None = None
