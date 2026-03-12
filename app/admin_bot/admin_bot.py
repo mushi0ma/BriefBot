@@ -1,27 +1,21 @@
 """
-Admin Telegram Bot — management and monitoring interface.
-Receives error alerts, provides stats, health checks, user management,
-data export, broadcast messaging, and template management.
+Admin Telegram Bot — management and control interface.
+Paradigm shift (v3.1): Bot is ONLY for management actions (broadcast,
+template upload). All dashboards, stats, and history live in the TMA.
 """
 
 from __future__ import annotations
 
 import asyncio
-import csv
 import io
 import json
-import time
-import tempfile
-from pathlib import Path
 
 import httpx
-import redis
 from aiogram import Bot, Dispatcher, Router, F
 from aiogram.filters import Command, CommandStart
 from aiogram.types import (
     BufferedInputFile,
     CallbackQuery,
-    FSInputFile,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     Message,
@@ -31,8 +25,6 @@ from aiogram.types import (
 )
 
 from app.config import get_settings
-from app.bot.stickers import StickerRegistry, send_temporary_sticker
-from app.db.history_repo import HistoryRepo
 from app.db.template_repo import (
     TemplateDBRepo,
     get_all_templates,
@@ -41,7 +33,6 @@ from app.db.template_repo import (
 from app.db.user_repo import UserRepo
 from app.logger import get_logger
 from app.models.brief import BriefTemplate
-from app.services.export import create_export_zip
 
 logger = get_logger("admin_bot")
 
@@ -51,23 +42,20 @@ router = Router()
 _pending_broadcasts: dict[int, str] = {}
 
 
-
-
-
 def _is_admin(message: Message) -> bool:
-    """Check if the sender is the authorized admin."""
+    """Check if the sender is an authorized admin."""
     settings = get_settings()
     return message.from_user and message.from_user.id in settings.admin_ids
 
 
 def admin_main_keyboard() -> ReplyKeyboardMarkup:
-    """Persistent reply keyboard with common admin actions."""
+    """Persistent reply keyboard: Dashboard (WebApp), Broadcast, Manage."""
+    settings = get_settings()
     return ReplyKeyboardMarkup(
         keyboard=[
-            [
-                KeyboardButton(text="📊 Статистика"),
-                KeyboardButton(text="🌐 TMA Дашборд"),
-            ]
+            [KeyboardButton(text="📊 Открыть Дашборд", web_app=WebAppInfo(url=settings.tma_admin_url))],
+            [KeyboardButton(text="📢 Рассылка")],
+            [KeyboardButton(text="👥 Управление")],
         ],
         resize_keyboard=True,
     )
@@ -82,349 +70,28 @@ async def cmd_start_help(message: Message) -> None:
         return
 
     await message.answer(
-        "🛠 *BriefBot Admin Panel*\n\n"
-        "Доступные команды:\n"
-        "/help — список команд (эта справка)\n"
-        "/stats — статистика\n"
-        "/health — проверка сервисов\n"
-        "/users — топ пользователей\n"
-        "/templates — список шаблонов\n"
-        "/reload — перезагрузить шаблоны\n"
-        "/export — выгрузить данные в CSV\n"
-        "/broadcast — рассылка всем пользователям\n"
-        "/dashboard — веб-панель администратора\n\n"
-        "📎 Отправьте JSON-файл шаблона для добавления.",
+        "🛠 *BriefBot Admin*\n\n"
+        "Используйте клавиатуру ниже для управления.\n"
+        "📎 Отправьте JSON-файл для загрузки шаблона.",
         parse_mode="Markdown",
         reply_markup=admin_main_keyboard(),
     )
 
 
-# ── /dashboard ───────────────────────────────────────────────────────────────
-@router.message(Command("dashboard"))
-@router.message(F.text == "🌐 TMA Дашборд")
-async def cmd_dashboard(message: Message) -> None:
-    """Open the admin dashboard Mini App."""
-    if not _is_admin(message):
-        return
-
-    from aiogram.types import WebAppInfo, InlineKeyboardButton, InlineKeyboardMarkup
-
-    settings = get_settings()
-    dashboard_url = settings.tma_admin_url
-
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(
-            text="📊 Открыть дашборд",
-            web_app=WebAppInfo(url=dashboard_url),
-        )],
-    ])
-
-    await message.answer(
-        "📊 *Веб-панель администратора*\n\n"
-        "Нажмите кнопку ниже для открытия дашборда:",
-        reply_markup=keyboard,
-        parse_mode="Markdown",
-    )
-
-
-# ── /stats ───────────────────────────────────────────────────────────────────
-@router.message(Command("stats"))
-@router.message(F.text == "📊 Статистика")
-async def cmd_stats(message: Message) -> None:
-    """Show aggregated statistics."""
-    if not _is_admin(message):
-        return
-
-    user_stats = await UserRepo.get_stats()
-    brief_stats = await HistoryRepo.get_stats()
-
-    text = (
-        "📊 *Статистика BriefBot*\n\n"
-        f"👥 Всего пользователей: *{user_stats['total_users']}*\n"
-        f"📄 Всего брифов: *{brief_stats['total_briefs']}*\n"
-        f"📅 Сегодня: *{brief_stats['today_briefs']}*\n"
-        f"✅ Успешных: *{brief_stats['successful']}*\n"
-        f"❌ Ошибок: *{brief_stats['failed']}*\n"
-    )
-
-    if brief_stats["total_briefs"] > 0:
-        success_rate = (brief_stats["successful"] / brief_stats["total_briefs"]) * 100
-        text += f"\n📈 Успешность: *{success_rate:.1f}%*"
-
-    keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[[InlineKeyboardButton(text="🔄 Обновить", callback_data="admin:stats:refresh")]]
-    )
-
-    settings = get_settings()
-    await message.answer(text, reply_markup=keyboard, parse_mode="Markdown")
-    registry = StickerRegistry.from_settings(settings)
-    await send_temporary_sticker(message, message.chat.id, registry.STATS)
-
-
-@router.callback_query(F.data == "admin:stats:refresh")
-async def on_stats_refresh(callback: CallbackQuery) -> None:
-    """Handle stats refresh button."""
-    await callback.answer("Обновление статистики...")
-    # Just route to the main stats handler but we must pass a Message
-    # Since we need to reply to the current message:
-    message = callback.message
-    message.from_user = callback.from_user  # Mock from_user for _is_admin check
-    await cmd_stats(message)
-
-
-# ── /health ──────────────────────────────────────────────────────────────────
-@router.message(Command("health"))
-async def cmd_health(message: Message) -> None:
-    """Check health of all external services."""
-    if not _is_admin(message):
-        return
-
-    settings = get_settings()
-    checks: list[str] = []
-
-    # Redis check
-    try:
-        start = time.monotonic()
-        r = redis.from_url(settings.redis_url)
-        r.ping()
-        elapsed = int((time.monotonic() - start) * 1000)
-        checks.append(f"✅ Redis: OK ({elapsed}ms)")
-    except Exception as e:
-        checks.append(f"❌ Redis: {e}")
-
-    # Supabase check
-    try:
-        start = time.monotonic()
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            resp = await client.get(f"{settings.supabase_url}/rest/v1/", headers={
-                "apikey": settings.supabase_key,
-                "Authorization": f"Bearer {settings.supabase_key}",
-            })
-        elapsed = int((time.monotonic() - start) * 1000)
-        if resp.status_code < 400:
-            checks.append(f"✅ Supabase: OK ({elapsed}ms)")
-        else:
-            checks.append(f"⚠️ Supabase: HTTP {resp.status_code} ({elapsed}ms)")
-    except Exception as e:
-        checks.append(f"❌ Supabase: {e}")
-
-    # OpenAI check
-    try:
-        start = time.monotonic()
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            resp = await client.get(
-                "https://api.openai.com/v1/models",
-                headers={"Authorization": f"Bearer {settings.openai_api_key}"},
-            )
-        elapsed = int((time.monotonic() - start) * 1000)
-        if resp.status_code == 200:
-            checks.append(f"✅ OpenAI: OK ({elapsed}ms)")
-        else:
-            checks.append(f"⚠️ OpenAI: HTTP {resp.status_code} ({elapsed}ms)")
-    except Exception as e:
-        checks.append(f"❌ OpenAI: {e}")
-
-    text = "🏥 *Health Check*\n\n" + "\n".join(checks)
-
-    keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[[InlineKeyboardButton(text="🔄 Проверить снова", callback_data="admin:health:refresh")]]
-    )
-
-    settings = get_settings()
-    await message.answer(text, reply_markup=keyboard, parse_mode="Markdown")
-    
-    has_errors = any("❌" in c or "⚠️" in c for c in checks)
-    if has_errors:
-        registry = StickerRegistry.from_settings(settings)
-        await send_temporary_sticker(message, message.chat.id, registry.HEALTH_ERRORS)
-    else:
-        registry = StickerRegistry.from_settings(settings)
-        await send_temporary_sticker(message, message.chat.id, registry.HEALTH_HEALTHY)
-
-
-@router.callback_query(F.data == "admin:health:refresh")
-async def on_health_refresh(callback: CallbackQuery) -> None:
-    """Handle health refresh button."""
-    await callback.answer("Проверка статусов...")
-    message = callback.message
-    message.from_user = callback.from_user  # Mock from_user for _is_admin check
-    await cmd_health(message)
-
-
-# ── /users ───────────────────────────────────────────────────────────────────
-@router.message(Command("users"))
-async def cmd_users(message: Message) -> None:
-    """Show top 10 most active users."""
-    if not _is_admin(message):
-        return
-
-    users = (await UserRepo.get_all_users())[:10]
-    if not users:
-        await message.answer("📭 Пока нет зарегистрированных пользователей.")
-        return
-
-    lines = ["👥 *Топ пользователей:*\n"]
-    for i, u in enumerate(users, 1):
-        username = u.get("username") or u.get("first_name") or "N/A"
-        tg_id = u.get("telegram_id")
-        briefs = u.get("briefs_count", 0)
-        blocked = " 🚫" if u.get("is_blocked") else ""
-        lines.append(f"{i}. @{username} (`{tg_id}`) — {briefs} брифов{blocked}")
-
-    await message.answer("\n".join(lines), parse_mode="Markdown")
-
-
-# ── /templates ───────────────────────────────────────────────────────────────
-@router.message(Command("templates"))
-async def cmd_templates(message: Message) -> None:
-    """List available templates."""
-    if not _is_admin(message):
-        return
-
-    templates = get_all_templates()
-    lines = ["📋 *Доступные шаблоны:*\n"]
-    for slug, tpl in templates.items():
-        sections_count = len(tpl.sections)
-        lines.append(f"• *{tpl.name}* (`{slug}`) — {sections_count} секций")
-        if tpl.description:
-            lines.append(f"  _{tpl.description[:80]}_")
-
-    await message.answer("\n".join(lines), parse_mode="Markdown")
-
-
-# ── /reload ──────────────────────────────────────────────────────────────────
-@router.message(Command("reload"))
-async def cmd_reload(message: Message) -> None:
-    """Reload templates from files."""
-    if not _is_admin(message):
-        return
-
-    reload_templates()
-    templates = get_all_templates()
-    await message.answer(f"🔄 Шаблоны перезагружены: {len(templates)} шт.")
-
-
-# ── /export ──────────────────────────────────────────────────────────────────
-@router.message(Command("export"))
-async def cmd_export(message: Message) -> None:
-    """Export users and brief_history to CSV files."""
-    if not _is_admin(message):
-        return
-
-    await message.answer("📦 Подготавливаю экспорт данных...")
-
-    try:
-        users = await UserRepo.get_all_users()
-        history = await HistoryRepo.get_all_history()
-
-        # Users CSV
-        users_file = _build_csv(
-            users,
-            fieldnames=["telegram_id", "username", "first_name", "last_name",
-                        "briefs_count", "is_blocked", "first_seen", "updated_at"],
-            filename="users_export.csv",
-        )
-
-        # History CSV
-        history_file = _build_csv(
-            history,
-            fieldnames=["telegram_id", "template_slug", "processing_state",
-                        "processing_time_ms", "error_message", "created_at"],
-            filename="history_export.csv",
-        )
-
-        if users_file:
-            doc = FSInputFile(users_file, filename="users_export.csv")
-            await message.answer_document(doc, caption=f"👥 Пользователи: {len(users)} записей")
-
-        if history_file:
-            doc = FSInputFile(history_file, filename="history_export.csv")
-            await message.answer_document(doc, caption=f"📄 История брифов: {len(history)} записей")
-
-        if not users_file and not history_file:
-            await message.answer("📭 Нет данных для экспорта.")
-
-        # Cleanup temp files
-        for f in [users_file, history_file]:
-            if f:
-                Path(f).unlink(missing_ok=True)
-
-    except Exception as e:
-        logger.error("export_error", error=str(e), exc_info=True)
-        await message.answer(f"❌ Ошибка экспорта: {e}")
-
-
-# ── /download_keyword ────────────────────────────────────────────────────────
-@router.message(Command("download_keyword"))
-async def cmd_mass_download_keyword(message: Message) -> None:
-    """Mass download briefs matching a specific keyword/tag into a zip archive."""
-    if not _is_admin(message):
-        return
-
-    text = message.text or ""
-    parts = text.split(None, 1)
-    if len(parts) < 2:
-        await message.answer(
-            "📦 *Массовое скачивание*\n\n"
-            "Укажите тег для поиска после команды.\n"
-            "Пример: `/download_keyword design`",
-            parse_mode="Markdown"
-        )
-        return
-
-    keyword = parts[1].strip()
-    await message.answer(f"🔍 Ищу отчеты по тегу: *{keyword}*...", parse_mode="Markdown")
-
-    try:
-        results = await HistoryRepo.search_briefs(keyword=keyword)
-        if not results:
-            await message.answer(f"📭 Не найдено отчетов по тегу: *{keyword}*", parse_mode="Markdown")
-            return
-
-        await message.answer(f"⏳ Найдено отчетов: *{len(results)}*. Формирую ZIP архив...", parse_mode="Markdown")
-        
-        zip_buffer = await create_export_zip(results)
-        if not zip_buffer:
-            await message.answer("❌ Ошибка при формировании ZIP архива.")
-            return
-        # We need to workaround FSInputFile requiring a valid Path by passing the bytes via BufferedInputFile 
-        from aiogram.types import BufferedInputFile
-        doc_bytes = BufferedInputFile(zip_buffer.read(), filename=f"export_{keyword}.zip")
-        
-        await message.answer_document(doc_bytes, caption=f"📦 Скачанные отчеты по тегу: *{keyword}*")
-
-        # Mark as downloaded
-        record_ids = [r["id"] for r in results if r.get("id")]
-        await HistoryRepo.mark_as_downloaded(record_ids)
-
-    except Exception as e:
-        logger.error("mass_download_error", error=str(e), exc_info=True)
-        await message.answer(f"❌ Ошибка массового скачивания: {e}")
-
-def _build_csv(data: list[dict], fieldnames: list[str], filename: str) -> str | None:
-    """Build a CSV file from a list of dicts and return the temp file path."""
-    if not data:
-        return None
-
-    tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False, encoding="utf-8-sig")
-    writer = csv.DictWriter(tmp, fieldnames=fieldnames, extrasaction="ignore")
-    writer.writeheader()
-    writer.writerows(data)
-    tmp.close()
-    return tmp.name
-
-
-# ── /broadcast ────────────────────────────────────────────────────────────────
+# ── Broadcast (📢 Рассылка) ──────────────────────────────────────────────────
 @router.message(Command("broadcast"))
+@router.message(F.text == "📢 Рассылка")
 async def cmd_broadcast(message: Message) -> None:
     """Send a broadcast message to all users. Usage: /broadcast <text>"""
     if not _is_admin(message):
         return
 
     # Parse text after /broadcast
-    text = message.text
-    if text:
+    text = message.text or ""
+    if text.startswith("/broadcast"):
         text = text.split(None, 1)[1] if len(text.split(None, 1)) > 1 else ""
+    elif text == "📢 Рассылка":
+        text = ""
 
     if not text:
         await message.answer(
@@ -444,7 +111,6 @@ async def cmd_broadcast(message: Message) -> None:
 
     from app.bot.keyboards import broadcast_confirm_keyboard
 
-    settings = get_settings()
     await message.answer(
         f"📢 *Подтвердите рассылку*\n\n"
         f"Текст: _{text[:200]}_\n\n"
@@ -453,8 +119,6 @@ async def cmd_broadcast(message: Message) -> None:
         reply_markup=broadcast_confirm_keyboard(),
         parse_mode="Markdown",
     )
-    registry = StickerRegistry.from_settings(settings)
-    await send_temporary_sticker(message, message.chat.id, registry.MISSING_FIELDS)
 
 
 @router.callback_query(F.data == "broadcast:confirm")
@@ -518,6 +182,30 @@ async def on_broadcast_cancel(callback: CallbackQuery) -> None:
     _pending_broadcasts.pop(admin_id, None)
     await callback.answer("Рассылка отменена.")
     await callback.message.edit_text("📢 Рассылка отменена.")
+
+
+# ── 👥 Управление (placeholder) ──────────────────────────────────────────────
+@router.message(F.text == "👥 Управление")
+async def cmd_manage(message: Message) -> None:
+    """Show management options."""
+    if not _is_admin(message):
+        return
+
+    settings = get_settings()
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(
+            text="📊 Открыть дашборд",
+            web_app=WebAppInfo(url=settings.tma_admin_url),
+        )],
+    ])
+
+    await message.answer(
+        "👥 *Управление*\n\n"
+        "Для просмотра пользователей, статистики и health-check\n"
+        "используйте *TMA Дашборд*.",
+        reply_markup=keyboard,
+        parse_mode="Markdown",
+    )
 
 
 # ── Template Upload (Document Handler) ────────────────────────────────────────
