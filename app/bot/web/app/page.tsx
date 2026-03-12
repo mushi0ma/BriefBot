@@ -7,9 +7,17 @@ import { type UserSettings } from "@/src/entities/user";
 import { TabIcon, type Tab, SkeletonSection, SkeletonColorGrid } from "@/src/shared/ui";
 import { createApiFetch } from "@/src/shared/api";
 import { AlertCircle, RefreshCw } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
 import { HistoryTab } from "@/src/widgets/history-tab";
 import { SettingsTab } from "@/src/widgets/settings-tab";
 import { TemplatesTab } from "@/src/widgets/templates-tab";
+import { ProfileHeader } from "@/src/widgets/profile-header";
+
+const tabVariants = {
+  initial: { opacity: 0, y: 8 },
+  animate: { opacity: 1, y: 0 },
+  exit: { opacity: 0, y: -8 },
+};
 
 /* ── Dashboard ────────────────────────────────────────────────── */
 export default function Dashboard() {
@@ -78,11 +86,14 @@ export default function Dashboard() {
   return (
     <main className="min-h-screen pb-24 max-w-lg mx-auto">
       <div className="px-4 pt-4 pb-3">
-        <h1 className="text-[20px] font-semibold">Личный кабинет</h1>
+        <h1 className="text-[20px] font-semibold tracking-tight">Личный кабинет</h1>
       </div>
 
+      {/* Profile Header */}
+      <ProfileHeader briefsCount={briefs.length} />
+
       {saveError && (
-        <div className="mx-4 mb-3 px-3 py-2 rounded-xl bg-red-500/10 text-red-500 text-[13px] flex items-center gap-2 animate-in">
+        <div className="mx-4 mb-3 px-3 py-2 rounded-xl bg-red-500/10 text-red-500 text-[13px] flex items-center gap-2">
           <AlertCircle className="w-4 h-4 shrink-0" />
           <span>{saveError}</span>
         </div>
@@ -140,11 +151,20 @@ export default function Dashboard() {
           </button>
         </div>
       ) : (
-        <div className="animate-in">
-          {tab === "history" && <HistoryTab briefs={briefs} />}
-          {tab === "settings" && <SettingsTab settings={settings} onUpdate={updateSetting} saving={saving} />}
-          {tab === "templates" && <TemplatesTab selected={settings.default_template} onSelect={(slug) => updateSetting("default_template", slug)} saving={saving} />}
-        </div>
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={tab}
+            variants={tabVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            transition={{ duration: 0.2, ease: "easeInOut" }}
+          >
+            {tab === "history" && <HistoryTab briefs={briefs} />}
+            {tab === "settings" && <SettingsTab settings={settings} onUpdate={updateSetting} saving={saving} />}
+            {tab === "templates" && <TemplatesTab selected={settings.default_template} onSelect={(slug) => updateSetting("default_template", slug)} saving={saving} />}
+          </motion.div>
+        </AnimatePresence>
       )}
 
       <nav className="tg-tab-bar">
