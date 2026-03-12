@@ -21,7 +21,7 @@ interface TemplatePickerProps {
 export function TemplatePicker({ templates, selected, onSelect, disabled }: TemplatePickerProps) {
   return (
     <>
-      {templates.map((t, i) => {
+      {templates.map((t) => {
         const isSelected = selected === t.slug;
         const Icon = ICON_MAP[t.slug] || Target;
         return (

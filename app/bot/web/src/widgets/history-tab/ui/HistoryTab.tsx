@@ -1,11 +1,13 @@
 "use client";
 import React, { useState, useCallback } from 'react';
 import { type Brief, BriefRow } from '@/src/entities/brief';
-import { Inbox, Clock, Download, Archive, Loader2, AlertCircle } from 'lucide-react';
+import { Clock, Download, Archive, Loader2, AlertCircle } from 'lucide-react';
 import { useTelegram } from '@/src/shared/lib/telegram';
 import { createApiFetch } from '@/src/shared/api';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
+import { motion } from 'framer-motion';
+import { EmptyState } from '@/src/shared/ui';
 
 interface HistoryTabProps {
   briefs: Brief[];
@@ -99,21 +101,7 @@ export function HistoryTab({ briefs: initialBriefs }: HistoryTabProps) {
   };
 
   if (briefs.length === 0) {
-    return (
-      <div className="px-4">
-        <div className="tg-section rounded-xl p-8 text-center">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-[var(--tg-theme-button-color,#3e88f7)]/10 mb-3">
-            <Inbox className="w-7 h-7 text-[var(--tg-theme-button-color,#3e88f7)]" />
-          </div>
-          <p className="text-[15px] text-[var(--tg-theme-text-color,#fff)]">
-            Пока нет брифов
-          </p>
-          <p className="text-[13px] text-[var(--tg-theme-hint-color,#98989e)] mt-1">
-            Отправьте аудио или текст боту
-          </p>
-        </div>
-      </div>
-    );
+    return <EmptyState />;
   }
 
   return (
@@ -152,7 +140,14 @@ export function HistoryTab({ briefs: initialBriefs }: HistoryTabProps) {
       </div>
       <div className="mx-4 flex flex-col gap-2">
         {briefs.map((b, i) => (
-          <BriefRow key={b.id} brief={b} isLast={i === briefs.length - 1} />
+          <motion.div
+            key={b.id}
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: i * 0.05, ease: 'easeOut' }}
+          >
+            <BriefRow brief={b} isLast={i === briefs.length - 1} />
+          </motion.div>
         ))}
       </div>
     </>

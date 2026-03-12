@@ -7,7 +7,7 @@ import { HistoryTab } from '../ui/HistoryTab';
 describe('HistoryTab', () => {
   it('renders empty state when no briefs', () => {
     render(<HistoryTab briefs={[]} />);
-    expect(screen.getByText('Пока нет брифов')).toBeInTheDocument();
+    expect(screen.getByText('Здесь пока пусто')).toBeInTheDocument();
   });
 
   it('renders brief list when briefs exist', () => {

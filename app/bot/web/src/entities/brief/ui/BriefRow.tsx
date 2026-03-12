@@ -3,7 +3,7 @@ import type { Brief } from '../model/schema';
 import { formatDate, stateInfo } from '../model/helpers';
 import { FileText, Download } from 'lucide-react';
 
-export function BriefRow({ brief, isLast }: { brief: Brief; isLast: boolean }) {
+export function BriefRow({ brief }: { brief: Brief; isLast?: boolean }) {
   const status = stateInfo(brief.processing_state);
   const summary = brief.brief_data?.summary;
   const hasPdf = brief.pdf_url && brief.pdf_url.startsWith("http");

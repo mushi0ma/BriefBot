@@ -599,10 +599,11 @@ async def handle_text(message: Message, state: FSMContext) -> None:
         f"✅ Принято! (сообщений: {chunk_count})\n"
         "Напишите ещё детали или нажмите кнопку ниже.\n\n"
         f"Шаблон: *{template_slug}*",
-        f"Шаблон: *{template_slug}*",
         reply_markup=generate_brief_keyboard(),
         parse_mode="Markdown",
     )
+    
+    settings = get_settings()
     await _send_sticker(message, message.chat.id, settings.sticker_think_id)
 
 
@@ -716,10 +717,13 @@ async def on_fill_missing_info(callback: CallbackQuery, state: FSMContext) -> No
 
     await callback.answer()
     await _send_sticker(callback.message, callback.message.chat.id, get_settings().sticker_ask_id)
+    parts = [f"✍ *Введите недостающую информацию:*\n"]
+    for line in missing.split('\n'):
+        parts.append(f"_{_escape_md2(line)}_")
+    parts.append(f"\nНапишите ваш ответ текстом:")
+
     await callback.message.edit_text(
-        f"✍ *Введите недостающую информацию:*\n\n"
-        f"_{_escape_md2(missing)}_\n\n"
-        f"Напишите ваш ответ текстом:",
+        "\n".join(parts),
         parse_mode="MarkdownV2",
     )
 
@@ -975,11 +979,10 @@ def _build_draft_text(brief_data) -> str:
         _field(section.title, section.value)
 
     if brief_data.missing_info:
-        parts.append(
-            f"\n⚠️ *Нехватающая информация:*\n"
-            f"> _{_escape_md2(brief_data.missing_info)}_\n\n"
-            f"_Напишите уточнения или нажмите «Сгенерировать PDF»\._"
-        )
+        parts.append(f"\n⚠️ *Нехватающая информация:*")
+        for line in brief_data.missing_info.split('\n'):
+            parts.append(f"> _{_escape_md2(line)}_")
+        parts.append(f"\n_Напишите уточнения или нажмите «Сгенерировать PDF»\._")
 
     parts.append("\nПроверьте данные и выберите действие:")
 
