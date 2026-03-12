@@ -84,9 +84,9 @@ export default function Dashboard() {
   if (!isReady) return null;
 
   return (
-    <main className="min-h-screen pb-24 max-w-lg mx-auto">
-      <div className="px-4 pt-4 pb-3">
-        <h1 className="text-[20px] font-semibold tracking-tight">Личный кабинет</h1>
+    <main className="min-h-screen pb-24 max-w-lg mx-auto bg-zinc-50 text-zinc-900 font-sans">
+      <div className="px-4 pt-5 pb-3 bg-white border-b border-zinc-200">
+        <h1 className="text-lg font-semibold tracking-tight">Личный кабинет</h1>
       </div>
 
       {/* Profile Header */}
@@ -135,16 +135,16 @@ export default function Dashboard() {
         </div>
       ) : error ? (
         <div className="px-4 py-12 flex flex-col items-center gap-4 text-center animate-in">
-          <div className="w-12 h-12 rounded-2xl bg-red-500/10 flex items-center justify-center">
-            <AlertCircle className="w-6 h-6 text-red-500" />
+          <div className="w-12 h-12 rounded-xl bg-red-50 flex items-center justify-center border border-red-200">
+            <AlertCircle className="w-6 h-6 text-red-600" />
           </div>
           <div>
-            <p className="text-[15px] font-medium">Ошибка загрузки</p>
-            <p className="text-[13px] text-[var(--tg-theme-hint-color,#98989e)] mt-1">{error}</p>
+            <p className="text-sm font-medium text-zinc-900">Ошибка загрузки</p>
+            <p className="text-xs text-zinc-500 mt-1">{error}</p>
           </div>
           <button
             onClick={loadData}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--tg-theme-button-color,#3e88f7)] text-white text-[14px] font-medium transition-opacity hover:opacity-90"
+            className="flex items-center gap-2 px-4 py-2 rounded-md bg-zinc-900 text-white text-sm font-medium shadow-sm transition-opacity hover:opacity-90"
           >
             <RefreshCw className="w-4 h-4" />
             Повторить
@@ -167,14 +167,16 @@ export default function Dashboard() {
         </AnimatePresence>
       )}
 
-      <nav className="tg-tab-bar">
+      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-zinc-200 flex justify-around px-2 pb-[env(safe-area-inset-bottom,16px)] pt-2 z-50">
         {tabs.map((t) => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
-            className={`tg-tab ${tab === t.key ? "active" : ""}`}
+            className={`flex flex-col items-center gap-1 text-[10px] px-4 py-1.5 transition-colors rounded-md ${
+              tab === t.key ? "text-zinc-900 font-semibold" : "text-zinc-500 hover:text-zinc-700 hover:bg-zinc-50"
+            }`}
           >
-            <span className="tg-tab-icon">
+            <span className="text-[22px] leading-none mb-0.5">
               <TabIcon tab={t.key} active={tab === t.key} />
             </span>
             <span>{t.label}</span>

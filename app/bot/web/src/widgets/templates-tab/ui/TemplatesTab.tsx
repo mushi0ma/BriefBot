@@ -12,24 +12,26 @@ interface TemplatesTabProps {
 
 export function TemplatesTab({ selected, onSelect, saving }: TemplatesTabProps) {
   return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-2 px-4 mb-1">
-        <LayoutGrid className="w-3.5 h-3.5 text-[var(--tg-theme-hint-color,#98989e)]" />
-        <p className="text-[12px] font-semibold uppercase tracking-wider text-[var(--tg-theme-hint-color,#98989e)]">
-          Шаблон по умолчанию
+    <div className="space-y-4">
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-2 px-1 mb-1">
+          <LayoutGrid className="w-4 h-4 text-zinc-500" />
+          <h2 className="text-sm font-medium text-zinc-900 uppercase tracking-wide">
+            Шаблон по умолчанию
+          </h2>
+        </div>
+        <div className="rounded-md border border-zinc-200 bg-white shadow-sm overflow-hidden p-2">
+          <TemplatePicker
+            templates={TEMPLATES}
+            selected={selected}
+            onSelect={onSelect}
+            disabled={saving}
+          />
+        </div>
+        <p className="text-xs text-zinc-500 px-1 mt-1">
+          Выбранный шаблон будет использоваться по умолчанию при генерации новых брифов.
         </p>
       </div>
-      <div className="mx-4 flex flex-col gap-2">
-        <TemplatePicker
-          templates={TEMPLATES}
-          selected={selected}
-          onSelect={onSelect}
-          disabled={saving}
-        />
-      </div>
-      <p className="text-[12px] text-[var(--tg-theme-hint-color,#98989e)] px-8 mt-1">
-        Выбранный шаблон будет использоваться по умолчанию при генерации новых брифов.
-      </p>
     </div>
   );
 }
