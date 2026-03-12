@@ -65,4 +65,20 @@ CREATE TABLE IF NOT EXISTS templates (
 );
 
 CREATE INDEX IF NOT EXISTS idx_templates_slug ON templates (slug);
+
+-- ── pgvector extension ──────────────────────────────────────────────────
+CREATE EXTENSION IF NOT EXISTS vector;
+
+-- ── Flexible briefs: JSONB data + embedding + client_assessment ─────────
+ALTER TABLE brief_history ADD COLUMN IF NOT EXISTS data JSONB DEFAULT '{}';
+ALTER TABLE brief_history ADD COLUMN IF NOT EXISTS embedding vector(768);
+ALTER TABLE brief_history ADD COLUMN IF NOT EXISTS client_assessment TEXT DEFAULT '';
+ALTER TABLE brief_history ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT now();
+
+-- GIN index for JSONB queries on flexible data
+CREATE INDEX IF NOT EXISTS idx_history_data ON brief_history USING GIN (data);
+
+-- HNSW index for fast vector similarity search
+CREATE INDEX IF NOT EXISTS idx_history_embedding ON brief_history
+  USING hnsw (embedding vector_cosine_ops);
 """

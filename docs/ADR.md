@@ -1,4 +1,33 @@
 # Architecture Decision Records
+## ADR-017: Flexible Brief Schema & pgvector
+
+**Date:** 2026-03-12
+
+### Status
+Accepted
+
+### Context
+The `brief_history` table used a rigid column structure for brief fields (`title`, `keywords`, etc.). As we introduce custom templates with variable sections, a fixed schema cannot accommodate arbitrary fields without constant migrations. Additionally, we need semantic search capability ("find briefs similar to X") for future discovery features.
+
+### Decision
+1. **Flexible `data JSONB` column** — all user-facing brief sections are stored in a single JSONB column. Only metadata columns remain rigid (`id`, `user_id`, `status`, `created_at`, `updated_at`).
+2. **`pgvector` extension** — activated with `CREATE EXTENSION IF NOT EXISTS vector`. A `embedding vector(768)` column stores text embeddings (compatible with OpenAI `text-embedding-3-small` and Gemini embedding models).
+3. **`client_assessment TEXT`** — the client assessment removed from the user-facing bot is now persisted in DB for internal analytics.
+4. **`updated_at TIMESTAMPTZ`** — tracks record modification time.
+5. **Indexes** — GIN on `data` for JSONB queries; HNSW on `embedding` for cosine similarity search.
+
+### Consequences
+**Positive:**
+- Templates with arbitrary sections work without schema changes.
+- Semantic search infrastructure is ready for embeddings pipeline.
+- Client assessment data preserved for analytics.
+
+**Negative:**
+- JSONB queries are slightly slower than native columns (mitigated by GIN index).
+- `pgvector` adds a PostgreSQL extension dependency.
+
+---
+
 ## ADR-016: Interactive Draft Pattern and Celery Task Separation
 
 **Date:** 2026-03-11
