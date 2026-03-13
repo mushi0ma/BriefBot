@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { AdminUsersWidget } from '@/src/widgets/admin-users/ui/AdminUsersWidget';
-import { BottomNavBar } from '@/src/shared/ui/layout/BottomNavBar';
+import { BottomNavBar } from '@/src/shared/ui/layout';
 
 export default function AdminUsersPage() {
   const navItems = [
