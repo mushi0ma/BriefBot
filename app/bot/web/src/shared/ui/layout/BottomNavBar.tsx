@@ -14,7 +14,7 @@ interface BottomNavBarProps {
 
 export const BottomNavBar: React.FC<BottomNavBarProps> = ({ items, activeId, onChange }) => {
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-20 flex border-t border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md px-2 pb-6 pt-2">
+    <nav className="fixed bottom-0 left-0 right-0 z-20 flex border-t border-[var(--border-color)] bg-tg-bg/80 backdrop-blur-md px-2 pb-[env(safe-area-inset-bottom,16px)] pt-2">
       <div className="flex w-full items-center justify-around max-w-md mx-auto">
         {items.map((item) => {
           const isActive = item.id === activeId;
@@ -23,7 +23,7 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({ items, activeId, onC
               key={item.id}
               onClick={() => onChange(item.id)}
               className={`flex flex-1 flex-col items-center justify-center gap-1 p-2 transition-colors ${
-                isActive ? 'text-primary' : 'text-slate-500 dark:text-slate-400 hover:text-primary'
+                isActive ? 'text-tg-button' : 'text-tg-hint hover:text-tg-text'
               }`}
             >
               <div className="flex h-8 items-center justify-center">
