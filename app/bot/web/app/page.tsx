@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useTelegram } from "@/src/shared/lib/telegram";
 import { type Brief } from "@/src/entities/brief";
 import { type UserSettings } from "@/src/entities/user";
-import { type Tab, SkeletonSection, SkeletonColorGrid } from "@/src/shared/ui";
+import { type Tab } from "@/src/shared/ui";
 import { createApiFetch } from "@/src/shared/api";
 import { AlertCircle, RefreshCw } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
@@ -12,7 +12,7 @@ import { HistoryTab } from "@/src/widgets/history-tab";
 import { SettingsTab } from "@/src/widgets/settings-tab";
 import { TemplatesTab } from "@/src/widgets/templates-tab";
 import { ProfileHeader } from "@/src/widgets/profile-header";
-import { TopAppBar, BottomNavBar, type NavItem } from "@/src/shared/ui/layout";
+import { TopAppBar, BottomNavBar, type NavItem, LoadingState, AccessDeniedState } from "@/src/shared/ui";
 
 const tabVariants = {
   initial: { opacity: 0, y: 8 },
@@ -22,7 +22,7 @@ const tabVariants = {
 
 /* ── Dashboard ────────────────────────────────────────────────── */
 export default function Dashboard() {
-  const { initData, isReady } = useTelegram();
+  const { initData, isReady, webApp } = useTelegram();
   const [tab, setTab] = useState<Tab>("history");
   const [briefs, setBriefs] = useState<Brief[]>([]);
   const [settings, setSettings] = useState<UserSettings>({
@@ -39,7 +39,7 @@ export default function Dashboard() {
   );
 
   const loadData = useCallback(() => {
-    if (!isReady) return;
+    if (!isReady || !initData) return;
     setLoading(true);
     setError(null);
     Promise.all([
@@ -55,7 +55,7 @@ export default function Dashboard() {
         setError(e instanceof Error ? e.message : "Не удалось загрузить данные");
       })
       .finally(() => setLoading(false));
-  }, [isReady, apiFetch]);
+  }, [isReady, initData, apiFetch]);
 
   useEffect(() => {
     loadData();
@@ -82,7 +82,20 @@ export default function Dashboard() {
     { id: "templates", label: "Шаблоны", icon: "dashboard" },
   ];
 
-  if (!isReady) return null;
+  if (!isReady) return <LoadingState />;
+
+  // Require telegram initData in production environments
+  // Since process.env might not easily distinguish local dev from deployed, we check if Telegram WebApp is present
+  if (isReady && !webApp && process.env.NODE_ENV !== "development") {
+    return <AccessDeniedState />;
+  }
+
+  // During local development, if we don't have mock data and no webApp, still show denied (unless we inject mock data)
+  // For safety, let's just check initData
+  if (!initData && process.env.NODE_ENV === "production") {
+    return <AccessDeniedState />;
+  }
+
 
   return (
     <main className="min-h-screen pb-24 max-w-lg mx-auto bg-tg-bg text-tg-text font-sans">
@@ -100,38 +113,8 @@ export default function Dashboard() {
         )}
 
         {loading ? (
-          <div className="animate-in">
-            {tab === "history" && (
-              <>
-                <div className="flex items-center gap-2 px-4 mb-3">
-                  <div className="skeleton h-10 flex-1 rounded-xl" />
-                  <div className="skeleton h-10 flex-1 rounded-xl" />
-                </div>
-                <div className="flex items-center gap-2 px-4 mb-1 mt-4">
-                  <div className="skeleton h-3 w-24" />
-                </div>
-                <SkeletonSection rows={4} />
-              </>
-            )}
-            {tab === "settings" && (
-              <div className="space-y-6">
-                <section>
-                  <div className="flex items-center gap-2 px-4 mb-2">
-                    <div className="skeleton h-3 w-28" />
-                  </div>
-                  <SkeletonColorGrid />
-                </section>
-                <section>
-                  <div className="flex items-center gap-2 px-4 mb-2">
-                    <div className="skeleton h-3 w-20" />
-                  </div>
-                  <div className="mx-4 tg-section rounded-xl p-4">
-                    <div className="skeleton h-10 w-full rounded-lg" />
-                  </div>
-                </section>
-              </div>
-            )}
-            {tab === "templates" && <SkeletonSection rows={4} />}
+          <div className="animate-in pt-12">
+            <LoadingState />
           </div>
         ) : error ? (
           <div className="px-4 py-12 flex flex-col items-center gap-4 text-center animate-in">
