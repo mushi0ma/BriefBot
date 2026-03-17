@@ -15,6 +15,31 @@ test.describe('Smoke Tests', () => {
   });
 
   test('main layout renders with tabs', async ({ page }) => {
+    await page.addInitScript(() => {
+      window.Telegram = {
+        WebApp: {
+          initData: 'query_id=mock_query_id&user=%7B%22id%22%3A123%2C%22first_name%22%3A%22Test%22%7D',
+          initDataUnsafe: { user: { id: 123, first_name: 'Test' } },
+          ready: () => {},
+          expand: () => {},
+          onEvent: () => {},
+          offEvent: () => {},
+          themeParams: { bg_color: '#1c1c1e', text_color: '#ffffff' },
+          colorScheme: 'dark'
+        }
+      };
+    });
+
+    // Intercept the real network request and fulfill it with a dummy script.
+    // This prevents the real Telegram script from loading and overwriting our InitScript.
+    await page.route('https://telegram.org/js/telegram-web-app.js', route => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/javascript',
+        body: 'console.log("Mocked Telegram script loaded");'
+      });
+    });
+
     await page.goto('/');
 
     // Wait for hydration
@@ -103,6 +128,31 @@ test.describe('Smoke Tests', () => {
   });
 
   test('tab navigation works', async ({ page }) => {
+    await page.addInitScript(() => {
+      window.Telegram = {
+        WebApp: {
+          initData: 'query_id=mock_query_id&user=%7B%22id%22%3A123%2C%22first_name%22%3A%22Test%22%7D',
+          initDataUnsafe: { user: { id: 123, first_name: 'Test' } },
+          ready: () => {},
+          expand: () => {},
+          onEvent: () => {},
+          offEvent: () => {},
+          themeParams: { bg_color: '#1c1c1e', text_color: '#ffffff' },
+          colorScheme: 'dark'
+        }
+      };
+    });
+
+    // Intercept the real network request and fulfill it with a dummy script.
+    // This prevents the real Telegram script from loading and overwriting our InitScript.
+    await page.route('https://telegram.org/js/telegram-web-app.js', route => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/javascript',
+        body: 'console.log("Mocked Telegram script loaded");'
+      });
+    });
+
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
@@ -120,5 +170,11 @@ test.describe('Smoke Tests', () => {
 
     // Page should still be functional (no crash)
     await expect(page.getByText('История')).toBeVisible();
+  });
+
+  test('shows Access Denied outside Telegram', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+    await expect(page.getByText('Только в Telegram')).toBeVisible();
   });
 });
