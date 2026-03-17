@@ -5,7 +5,7 @@ import { TemplatePicker } from '../ui/TemplatePicker';
 
 const MOCK_TEMPLATES = [
   { slug: 'default', icon: 'target', name: 'Универсальный', desc: 'Подходит для любых проектов' },
-  { slug: 'design', icon: 'paintbrush', name: 'Дизайн', desc: 'Визуальные проекты и брендинг' },
+  { slug: 'design', icon: 'paintbrush', name: 'Design', desc: 'Визуальные проекты и брендинг' },
 ];
 
 describe('TemplatePicker', () => {
@@ -20,7 +20,7 @@ describe('TemplatePicker', () => {
     );
 
     expect(screen.getByText('Универсальный')).toBeInTheDocument();
-    expect(screen.getByText('Дизайн')).toBeInTheDocument();
+    expect(screen.getByText('Design')).toBeInTheDocument();
   });
 
   it('shows check icon on selected template', () => {
@@ -34,10 +34,9 @@ describe('TemplatePicker', () => {
     );
 
     // The selected item should have a check SVG icon
-    const designButton = screen.getByText('Дизайн').closest('button')!;
-    const svgs = designButton.querySelectorAll('svg');
-    // Should have at least 2 SVGs: the template icon + the check icon
-    expect(svgs.length).toBeGreaterThanOrEqual(2);
+    const designButton = screen.getByText('Design').closest('button')!;
+    const checkIcon = designButton.querySelector('span.material-symbols-outlined');
+    expect(checkIcon).toBeInTheDocument();
   });
 
   it('calls onSelect when a template is clicked', () => {
@@ -51,7 +50,7 @@ describe('TemplatePicker', () => {
       />
     );
 
-    fireEvent.click(screen.getByText('Дизайн').closest('button')!);
+    fireEvent.click(screen.getByText('Design').closest('button')!);
     expect(handleSelect).toHaveBeenCalledWith('design');
   });
 
