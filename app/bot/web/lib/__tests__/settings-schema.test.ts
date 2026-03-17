@@ -14,6 +14,8 @@ describe('SettingsPatchSchema — Input Validation', () => {
       brand_color: '#FF5500',
       logo_url: 'https://example.com/logo.png',
       default_template: 'minimal',
+      include_assessment: false,
+      include_summary: true,
     });
     expect(result.success).toBe(true);
   });
@@ -95,6 +97,15 @@ describe('SettingsPatchSchema — Input Validation', () => {
   it('rejects SQL injection in template field', () => {
     const result = SettingsPatchSchema.safeParse({
       default_template: "'; DROP TABLE users; --",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  // ── Boolean toggles validation ──────────────────────────────────
+
+  it('rejects non-boolean values for toggles', () => {
+    const result = SettingsPatchSchema.safeParse({
+      include_assessment: 'true', // string instead of boolean
     });
     expect(result.success).toBe(false);
   });

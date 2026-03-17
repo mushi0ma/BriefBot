@@ -22,6 +22,11 @@ export const SettingsPatchSchema = z.object({
   default_template: z
     .enum(VALID_TEMPLATES)
     .optional(),
+  include_assessment: z.boolean().optional(),
+  include_keywords: z.boolean().optional(),
+  include_summary: z.boolean().optional(),
+  include_competitors: z.boolean().optional(),
+  include_tone: z.boolean().optional(),
 }).strict();
 
 export type SettingsPatch = z.infer<typeof SettingsPatchSchema>;

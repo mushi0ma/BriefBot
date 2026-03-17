@@ -4,6 +4,11 @@ export const UserSettingsSchema = z.object({
   brand_color: z.string().nullable(),
   logo_url: z.string().url().nullable().or(z.literal("")),
   default_template: z.string().nullable(),
+  include_assessment: z.boolean().nullable().optional(),
+  include_keywords: z.boolean().nullable().optional(),
+  include_summary: z.boolean().nullable().optional(),
+  include_competitors: z.boolean().nullable().optional(),
+  include_tone: z.boolean().nullable().optional(),
 });
 
 export type UserSettings = z.infer<typeof UserSettingsSchema>;

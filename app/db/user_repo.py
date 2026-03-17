@@ -102,12 +102,18 @@ class UserRepo:
         return await asyncio.to_thread(_inner)
 
     @staticmethod
-    async def update_branding(
+    async def update_settings(
         telegram_id: int,
         brand_color: str | None = None,
         logo_url: str | None = None,
+        default_template: str | None = None,
+        include_assessment: bool | None = None,
+        include_keywords: bool | None = None,
+        include_summary: bool | None = None,
+        include_competitors: bool | None = None,
+        include_tone: bool | None = None,
     ) -> None:
-        """Update user branding settings (accent color, logo)."""
+        """Update user branding and customization settings."""
 
         @_retry
         def _inner() -> None:
@@ -117,8 +123,20 @@ class UserRepo:
                 update_data["brand_color"] = brand_color
             if logo_url is not None:
                 update_data["logo_url"] = logo_url
+            if default_template is not None:
+                update_data["default_template"] = default_template
+            if include_assessment is not None:
+                update_data["include_assessment"] = include_assessment
+            if include_keywords is not None:
+                update_data["include_keywords"] = include_keywords
+            if include_summary is not None:
+                update_data["include_summary"] = include_summary
+            if include_competitors is not None:
+                update_data["include_competitors"] = include_competitors
+            if include_tone is not None:
+                update_data["include_tone"] = include_tone
             if update_data:
                 sb.table(UserRepo.TABLE).update(update_data).eq("telegram_id", telegram_id).execute()
-                logger.info("user_branding_updated", telegram_id=telegram_id, fields=list(update_data.keys()))
+                logger.info("user_settings_updated", telegram_id=telegram_id, fields=list(update_data.keys()))
 
         await asyncio.to_thread(_inner)

@@ -21,14 +21,23 @@ export async function GET(request: Request) {
         const sb = getSupabaseAdmin();
         const { data, error } = await sb
             .from("users")
-            .select("brand_color, logo_url, default_template")
+            .select("brand_color, logo_url, default_template, include_assessment, include_keywords, include_summary, include_competitors, include_tone")
             .eq("telegram_id", user.id)
             .limit(1)
             .single();
 
         if (error) {
             return NextResponse.json(
-                { brand_color: null, logo_url: null, default_template: "default" }
+                {
+                    brand_color: null,
+                    logo_url: null,
+                    default_template: "default",
+                    include_assessment: true,
+                    include_keywords: true,
+                    include_summary: true,
+                    include_competitors: true,
+                    include_tone: true
+                }
             );
         }
 
