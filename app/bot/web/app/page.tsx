@@ -61,7 +61,7 @@ export default function Dashboard() {
     loadData();
   }, [loadData]);
 
-  const updateSetting = async (field: string, value: string) => {
+  const updateSetting = async (field: string, value: string | boolean) => {
     setSaving(true);
     setSaveError(null);
     try {
@@ -86,13 +86,13 @@ export default function Dashboard() {
 
   // Require telegram initData in production environments
   // Since process.env might not easily distinguish local dev from deployed, we check if Telegram WebApp is present
-  if (isReady && !webApp && process.env.NODE_ENV !== "development") {
+  if (isReady && !webApp && process.env.NEXT_PUBLIC_ALLOW_OUTSIDE !== "true") {
     return <AccessDeniedState />;
   }
 
   // During local development, if we don't have mock data and no webApp, still show denied (unless we inject mock data)
   // For safety, let's just check initData
-  if (!initData && process.env.NODE_ENV === "production") {
+  if (!initData && process.env.NEXT_PUBLIC_ALLOW_OUTSIDE !== "true") {
     return <AccessDeniedState />;
   }
 

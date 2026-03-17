@@ -8,7 +8,7 @@ const DEFAULT_SETTINGS = { brand_color: null, logo_url: null, default_template: 
 describe('SettingsTab', () => {
   it('renders color and logo sections', () => {
     render(<SettingsTab settings={DEFAULT_SETTINGS} onUpdate={() => {}} saving={false} />);
-    expect(screen.getByText('Цвет акцента PDF')).toBeInTheDocument();
-    expect(screen.getByText('Логотип')).toBeInTheDocument();
+    expect(screen.getByText('PDF Accent Color')).toBeInTheDocument();
+    expect(screen.getByText('Company Logo')).toBeInTheDocument();
   });
 });

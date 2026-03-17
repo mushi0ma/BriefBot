@@ -1,15 +1,6 @@
 "use client";
 import React from 'react';
 import { type Template } from '@/src/entities/template';
-import { Check, ChevronRight, Target, Paintbrush, Code2, BarChart3 } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
-
-const ICON_MAP: Record<string, LucideIcon> = {
-  default: Target,
-  design: Paintbrush,
-  development: Code2,
-  marketing: BarChart3,
-};
 
 interface TemplatePickerProps {
   templates: Template[];
@@ -20,40 +11,47 @@ interface TemplatePickerProps {
 
 export function TemplatePicker({ templates, selected, onSelect, disabled }: TemplatePickerProps) {
   return (
-    <>
+    <div className="flex flex-col gap-3">
       {templates.map((t) => {
-        const isSelected = selected === t.slug;
-        const Icon = ICON_MAP[t.slug] || Target;
+        const isSelected = selected === t.slug || (selected === null && t.slug === 'default');
+
         return (
           <button
             key={t.slug}
             onClick={() => onSelect(t.slug)}
             disabled={disabled}
-            className={`tg-list-item w-full text-left outline-none ${
+            className={`w-full text-left outline-none transition-all duration-200 rounded-[20px] p-4 flex items-center gap-4 ${
               isSelected 
-                ? "ring-2 ring-inset ring-[var(--tg-theme-button-color,#3e88f7)] bg-[var(--tg-theme-button-color,#3e88f7)]/5" 
-                : "hover:bg-[var(--tg-theme-bg-color,#1c1c1e)] hover:shadow-sm"
-            }`}
+                ? "bg-tg-button/10 border border-tg-button shadow-sm"
+                : "bg-tg-secondary-bg/30 border border-tg-hint/10 active:scale-[0.98] hover:bg-tg-secondary-bg/50"
+            } ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
           >
-            <div className={`tg-list-icon transition-colors duration-200 ${
+            <div className={`w-[48px] h-[48px] rounded-2xl flex items-center justify-center shrink-0 transition-colors ${
               isSelected
-                ? "bg-[var(--tg-theme-button-color,#3e88f7)] text-white shadow-md shadow-[var(--tg-theme-button-color,#3e88f7)]/20"
-                : "bg-[var(--tg-theme-secondary-bg-color,#2c2c2e)] text-[var(--tg-theme-button-color,#3e88f7)]"
+                ? "bg-tg-button text-white shadow-md shadow-tg-button/30"
+                : "bg-tg-hint/10 text-tg-hint"
             }`}>
-              <Icon className="w-5 h-5" />
+              <span className="material-symbols-outlined text-[24px]">{t.icon || "article"}</span>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-[15px] font-medium text-[var(--tg-theme-text-color,#fff)]">{t.name}</p>
-              <p className="text-[13px] leading-relaxed text-[var(--tg-theme-hint-color,#98989e)] mt-0.5">{t.desc}</p>
+
+            <div className="flex-1 min-w-0 flex flex-col justify-center gap-0.5">
+              <div className="flex justify-between items-center">
+                <p className={`text-[17px] font-semibold truncate tracking-tight ${
+                  isSelected ? "text-tg-button" : "text-tg-text"
+                }`}>
+                  {t.name}
+                </p>
+                {isSelected && (
+                  <span className="material-symbols-outlined text-tg-button text-[20px] ml-2 shrink-0">
+                    check_circle
+                  </span>
+                )}
+              </div>
+              <p className="text-[14px] leading-snug text-tg-hint line-clamp-2 pr-2">{t.desc}</p>
             </div>
-            {isSelected ? (
-              <Check className="w-5 h-5 text-[var(--tg-theme-button-color,#3e88f7)]" strokeWidth={3} />
-            ) : (
-              <ChevronRight className="w-4 h-4 text-[var(--tg-theme-hint-color,#98989e)]" />
-            )}
           </button>
         );
       })}
-    </>
+    </div>
   );
 }

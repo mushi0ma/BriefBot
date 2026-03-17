@@ -6,14 +6,14 @@ import { TemplatesTab } from '../ui/TemplatesTab';
 describe('TemplatesTab', () => {
   it('renders template list header', () => {
     render(<TemplatesTab selected={null} onSelect={() => {}} saving={false} />);
-    expect(screen.getByText('Шаблон по умолчанию')).toBeInTheDocument();
+    expect(screen.getByText('Available Templates')).toBeInTheDocument();
   });
 
   it('renders all default templates', () => {
     render(<TemplatesTab selected={null} onSelect={() => {}} saving={false} />);
-    expect(screen.getByText('Универсальный')).toBeInTheDocument();
-    expect(screen.getByText('Дизайн')).toBeInTheDocument();
-    expect(screen.getByText('Разработка')).toBeInTheDocument();
-    expect(screen.getByText('Маркетинг')).toBeInTheDocument();
+    expect(screen.getByText('Universal')).toBeInTheDocument();
+    expect(screen.getByText('Design')).toBeInTheDocument();
+    expect(screen.getByText('Development')).toBeInTheDocument();
+    expect(screen.getByText('Marketing')).toBeInTheDocument();
   });
 });
