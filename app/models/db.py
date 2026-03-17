@@ -2,8 +2,20 @@
 Supabase table schema definitions (for documentation & migration SQL generation).
 """
 
-# SQL to create tables in Supabase.
 # Run this once in the Supabase SQL editor.
+
+from pydantic import BaseModel, Field
+
+class UserSettings(BaseModel):
+    """User preferences for brief generation and UI customization."""
+    brand_color: str = ""
+    logo_url: str = ""
+    default_template: str = "default"
+    include_assessment: bool = True
+    include_keywords: bool = True
+    include_summary: bool = True
+    include_competitors: bool = True
+    include_tone: bool = True
 
 MIGRATION_SQL = """
 -- ── Users ────────────────────────────────────────────────────────────────
@@ -22,6 +34,12 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 CREATE INDEX IF NOT EXISTS idx_users_telegram_id ON users (telegram_id);
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS include_assessment BOOLEAN DEFAULT true;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS include_keywords BOOLEAN DEFAULT true;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS include_summary BOOLEAN DEFAULT true;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS include_competitors BOOLEAN DEFAULT true;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS include_tone BOOLEAN DEFAULT true;
 
 -- ── Brief History ────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS brief_history (
