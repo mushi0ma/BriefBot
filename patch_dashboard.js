@@ -3,67 +3,29 @@ const path = './app/admin_bot/web/src/widgets/dashboard-tab/ui/DashboardTab.tsx'
 
 let content = fs.readFileSync(path, 'utf8');
 
-// Add use client
-content = `"use client";\n` + content;
+// Translations
+content = content.replace(/"Total Briefs"/g, '"Всего брифов"');
+content = content.replace(/"Total Users"/g, '"Всего пользователей"');
+content = content.replace(/"Premium Users"/g, '"Premium пользователи"');
+content = content.replace(/"All time"/g, '"За все время"');
+content = content.replace(/"Registered accounts"/g, '"Зарегистрировано"');
+content = content.replace(/"Active subscriptions"/g, '"Активные подписки"');
 
-// Add hooks and replace mock data
-const componentStart = content.indexOf('export function DashboardTab() {');
-const hooksToAdd = `
-  const { initData } = useTelegram();
-  const [data, setData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+content = content.replace(/>Brief Generation Volume</g, '>Объем генераций брифов<');
+content = content.replace(/>Last 7 days</g, '>За последние 7 дней<');
 
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        setLoading(true);
-        const res = await fetch('/api/stats', {
-          headers: {
-            'Authorization': \`Bearer \${initData || window.Telegram?.WebApp?.initData || ''}\`
-          }
-        });
-        if (!res.ok) throw new Error('Failed to fetch stats');
-        const json = await res.json();
-        setData(json);
-      } catch (err) {
-        console.error(err);
-        setError(true);
-      } finally {
-        setLoading(false);
-      }
-    };
+content = content.replace(/>Feature Adoption</g, '>Использование функций<');
+content = content.replace(/>PDF Exports</g, '>Экспорт в PDF<');
+content = content.replace(/>Saved Templates</g, '>Сохраненные шаблоны<');
+content = content.replace(/>Avg. Gen Time</g, '>Ср. время генерации<');
 
-    fetchStats();
-  }, [initData]);
+content = content.replace(/\['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'\]/g, "['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']");
 
-  if (loading) return <LoadingState />;
-  if (error) return <ErrorState onRetry={() => window.location.reload()} />;
-`;
-
-content = content.replace(
-  'import React from \'react\';',
-  'import React, { useState, useEffect } from \'react\';\nimport { useTelegram } from \'@/src/shared/lib/telegram\';\nimport { LoadingState } from \'@/src/shared/ui/states/LoadingState\';\nimport { ErrorState } from \'@/src/shared/ui/states/ErrorState\';'
-);
-
-content = content.replace(
-  'export function DashboardTab() {',
-  'export function DashboardTab() {' + hooksToAdd
-);
-
-// Replace hardcoded KPIs
-content = content.replace(
-  '<KpiCard title="Total Briefs" value="1,248" label="+14% this month" type="up" />',
-  '{/* Mock trend indicator as real backend currently provides only raw counts */}\n        <KpiCard title="Total Briefs" value={data?.totalBriefs?.toString() || "0"} label="All time" type="neutral" />'
-);
-content = content.replace(
-  '<KpiCard title="Active Users" value="842" label="Daily active metric" type="neutral" />',
-  '<KpiCard title="Total Users" value={data?.totalUsers?.toString() || "0"} label="Registered accounts" type="neutral" />'
-);
-content = content.replace(
-  '<KpiCard title="API Errors" value="12" label="-2 since yesterday" type="down" />',
-  '<KpiCard title="Premium Users" value={data?.premiumUsers?.toString() || "0"} label="Active subscriptions" type="up" />'
-);
+// Data mapping (remove mocked data)
+// Replace [40, 70, 45, 90, 65, 80, 100].map
+const mockedMapRegex = /\[40, 70, 45, 90, 65, 80, 100\]\.map\(\(height, i\) => \(/;
+const actualMapCode = `(data?.weeklyStats || [0, 0, 0, 0, 0, 0, 0]).map((height: number, i: number) => (`;
+content = content.replace(mockedMapRegex, actualMapCode);
 
 fs.writeFileSync(path, content);
 console.log('Patched DashboardTab.tsx');

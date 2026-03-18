@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { Terminal, Info, AlertTriangle, Search, Filter, RefreshCw, XCircle } from 'lucide-react';
+import { useTelegram } from '@/src/shared/lib/telegram';
+import React, { useState, useEffect } from 'react';
+import { Terminal, Search, Filter, RefreshCw } from 'lucide-react';
 
 type LogLevel = 'error' | 'warn' | 'info';
 
@@ -14,27 +15,46 @@ interface LogEntry {
 export function LogsTab() {
   const [activeFilter, setActiveFilter] = useState<LogLevel | 'all'>('all');
 
-  const MOCK_LOGS: LogEntry[] = [
-    { id: '1', timestamp: '10:42:15.342', level: 'error', service: 'pdf-generator', message: 'Failed to launch puppeteer instance: Timeout exceeded' },
-    { id: '2', timestamp: '10:41:02.111', level: 'warn', service: 'api-gateway', message: 'Rate limit approaching for user 892134' },
-    { id: '3', timestamp: '10:39:45.001', level: 'info', service: 'auth-service', message: 'User 12934 successfully authenticated via Telegram' },
-    { id: '4', timestamp: '10:35:12.888', level: 'info', service: 'db-sync', message: 'Completed background migration job #442' },
-    { id: '5', timestamp: '10:32:05.102', level: 'error', service: 'stripe-webhook', message: 'Signature verification failed for event evt_10924' },
-    { id: '6', timestamp: '10:28:55.992', level: 'warn', service: 'cache-layer', message: 'Redis connection latency spiked to 450ms' },
-    { id: '7', timestamp: '10:25:33.441', level: 'info', service: 'pdf-generator', message: 'Successfully generated brief doc_8823.pdf in 2.4s' },
-  ];
+
+  const { initData } = useTelegram();
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchLogs = async () => {
+      try {
+        setLoading(true);
+        const res = await fetch('/api/logs', {
+          headers: { 'Authorization': `Bearer ${initData || window.Telegram?.WebApp?.initData || ''}` }
+        });
+        if (res.ok) {
+          const json = await res.json();
+          setLogs(json.logs || []);
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchLogs();
+  }, [initData]);
+
 
   const getLogIcon = (level: LogLevel) => {
     switch (level) {
-      case 'error': return <XCircle className="w-4 h-4 text-[#FF3B30]" />;
-      case 'warn': return <AlertTriangle className="w-4 h-4 text-[#FF9500]" />;
-      case 'info': return <Info className="w-4 h-4 text-[#34C759]" />;
+      case 'error': return <span className="w-4 h-4 text-[#FF3B30] inline-block rounded-full bg-[#FF3B30] opacity-80" />; // Fallback dot if icons removed
+      case 'warn': return <span className="w-4 h-4 text-[#FF9500] inline-block rounded-full bg-[#FF9500] opacity-80" />;
+      case 'info': return <span className="w-4 h-4 text-[#34C759] inline-block rounded-full bg-[#34C759] opacity-80" />;
     }
   };
 
   const filteredLogs = activeFilter === 'all'
-    ? MOCK_LOGS
-    : MOCK_LOGS.filter(log => log.level === activeFilter);
+    ? logs
+    : logs.filter(log => log.level === activeFilter);
+
+  if (loading) return null;
+
 
   return (
     <div className="space-y-4 pb-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
@@ -57,13 +77,13 @@ export function LogsTab() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-tg-hint" />
               <input
                 type="text"
-                placeholder="Search logs..."
+                placeholder="Поиск логов..."
                 className="w-full h-10 pl-9 pr-4 bg-tg-secondary-bg/50 border border-tg-hint/20 rounded-xl text-[14px] font-mono focus:outline-none focus:ring-2 focus:ring-[var(--tg-theme-button-color,#3e88f7)]/30 transition-shadow"
               />
             </div>
             <button className="h-10 px-3 flex items-center justify-center gap-2 bg-tg-secondary-bg/50 border border-tg-hint/20 rounded-xl text-[var(--tg-theme-button-color,#3e88f7)] hover:bg-tg-hint/10 transition-colors shrink-0">
               <Filter className="w-4 h-4" />
-              <span className="text-[13px] font-semibold hidden sm:inline">Filters</span>
+              <span className="text-[13px] font-semibold hidden sm:inline">Фильтры</span>
             </button>
           </div>
         </div>

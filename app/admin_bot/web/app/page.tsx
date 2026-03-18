@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { TopAppBar, BottomNavBar, type NavItem, LoadingState, AdminRestrictedState } from "@/src/shared/ui";
+import { TopAppBar, BottomNavBar, type NavItem, LoadingState, AdminRestrictedState, AccessDeniedState } from "@/src/shared/ui";
 import { DashboardTab } from "@/src/widgets/dashboard-tab";
 import { UsersTab } from "@/src/widgets/users-tab";
 import { LogsTab } from "@/src/widgets/logs-tab";
@@ -20,6 +20,7 @@ export default function AdminDashboard() {
   const [tab, setTab] = useState<Tab>("dashboard");
   const [loading, setLoading] = useState(true);
   const [isAuthorized, setIsAuthorized] = useState(false);
+  const [isTelegram, setIsTelegram] = useState(false);
 
   const verifyAdmin = useCallback(() => {
     const MOCK_ADMIN_IDS = [123];
@@ -48,11 +49,28 @@ export default function AdminDashboard() {
       }
     }
 
+
+    // Check if telegram context was found within the try block
+    let isTgContext = false;
+    if (typeof window !== 'undefined') {
+       const tg = (window as unknown as { Telegram?: { WebApp?: { initData?: string, initDataUnsafe?: { user?: unknown } } } }).Telegram?.WebApp;
+       if (tg?.initData || tg?.initDataUnsafe?.user || sessionStorage.getItem('__telegram_init_data')) {
+           isTgContext = true;
+       }
+    }
+
+    if (isTgContext) {
+      setIsTelegram(true);
+    } else {
+      setIsTelegram(false);
+    }
+
     if (userId && MOCK_ADMIN_IDS.includes(userId)) {
       setIsAuthorized(true);
     } else {
       setIsAuthorized(false);
     }
+
     setLoading(false);
   }, []);
 
@@ -61,27 +79,34 @@ export default function AdminDashboard() {
   }, [verifyAdmin]);
 
   const navItems: NavItem[] = [
-    { id: "dashboard", label: "Dashboard", icon: "monitoring" },
-    { id: "users", label: "Users", icon: "group" },
-    { id: "logs", label: "Logs", icon: "terminal" },
-    { id: "health", label: "Health", icon: "ecg", badge: 1 },
+    { id: "dashboard", label: "Дашборд", icon: "monitoring" },
+    { id: "users", label: "Пользователи", icon: "group" },
+    { id: "logs", label: "Логи", icon: "terminal" },
+    { id: "health", label: "Статус", icon: "ecg", badge: 1 },
   ];
 
   const getTabTitle = (currentTab: Tab) => {
     switch (currentTab) {
-      case "dashboard": return "Analytics";
-      case "users": return "User Analytics";
-      case "logs": return "System Logs";
-      case "health": return "System Health";
-      default: return "Admin Panel";
+      case "dashboard": return "Аналитика";
+      case "users": return "Аналитика пользователей";
+      case "logs": return "Системные логи";
+      case "health": return "Состояние системы";
+      default: return "Админ панель";
     }
   };
 
   if (loading) return <LoadingState />;
 
-  if (!isAuthorized && process.env.NEXT_PUBLIC_ALLOW_OUTSIDE !== "true") {
-    return <AdminRestrictedState />;
+
+  if (process.env.NEXT_PUBLIC_ALLOW_OUTSIDE !== "true") {
+    if (!isTelegram) {
+      return <AccessDeniedState />;
+    }
+    if (!isAuthorized) {
+      return <AdminRestrictedState />;
+    }
   }
+
 
   return (
     <main className="min-h-screen pb-24 max-w-lg mx-auto bg-tg-bg text-tg-text font-sans">

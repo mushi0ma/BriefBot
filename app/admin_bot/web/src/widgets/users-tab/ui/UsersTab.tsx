@@ -51,7 +51,7 @@ export function UsersTab() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-tg-hint" />
             <input
               type="text"
-              placeholder="Search users..."
+              placeholder="Поиск пользователей..."
               className="w-full h-10 pl-9 pr-4 bg-tg-secondary-bg/50 border border-tg-hint/20 rounded-xl text-[15px] focus:outline-none focus:ring-2 focus:ring-[var(--tg-theme-button-color,#3e88f7)]/30 transition-shadow"
             />
           </div>
@@ -67,7 +67,7 @@ export function UsersTab() {
           <div className="bg-tg-bg rounded-2xl p-4 border border-tg-hint/10 shadow-sm">
             <div className="flex items-center gap-2 mb-2 text-tg-hint">
               <Crown className="w-4 h-4 text-[#FF9500]" />
-              <span className="text-[12px] font-bold uppercase tracking-wider">Premium Conversion</span>
+              <span className="text-[12px] font-bold uppercase tracking-wider">Конверсия в Premium</span>
             </div>
             <div className="flex items-end justify-between">
               <h4 className="text-[28px] font-black text-tg-text">{data?.totalUsers && data?.totalUsers > 0 ? Math.round((data.premiumUsers / data.totalUsers) * 100) : 0}%</h4>
@@ -79,10 +79,10 @@ export function UsersTab() {
           <div className="bg-tg-bg rounded-2xl p-4 border border-tg-hint/10 shadow-sm">
             <div className="flex items-center gap-2 mb-2 text-tg-hint">
               <Globe className="w-4 h-4 text-[var(--tg-theme-button-color,#3e88f7)]" />
-              <span className="text-[12px] font-bold uppercase tracking-wider">Top Region</span>
+              <span className="text-[12px] font-bold uppercase tracking-wider">Топ регион</span>
             </div>
             <div className="flex items-end justify-between">
-              <h4 className="text-[20px] font-black text-tg-text truncate">Europe</h4>
+              <h4 className="text-[20px] font-black text-tg-text truncate">Европа</h4>
               <span className="text-[11px] font-bold text-tg-hint mb-1">
                 42%
               </span>
@@ -122,13 +122,13 @@ export function UsersTab() {
               <div className="ml-3 flex-1 min-w-0">
                 <div className="flex items-center justify-between mb-0.5">
                   <h4 className="text-[16px] font-semibold text-tg-text truncate pr-2">{(user.first_name || user.name || "Unknown")}</h4>
-                  <span className="text-[12px] font-medium text-tg-hint shrink-0">{(user.lastActive || "Recently")}</span>
+                  <span className="text-[12px] font-medium text-tg-hint shrink-0">{(user.lastActive || "Недавно")}</span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <p className="text-[13px] text-tg-hint font-medium truncate">{(user.username ? `@${user.username}` : "No username")}</p>
+                  <p className="text-[13px] text-tg-hint font-medium truncate">{(user.username ? `@${user.username}` : "Нет username")}</p>
                   <div className="flex items-center gap-1 text-[12px] text-tg-hint font-medium">
                     <div className="w-1 h-1 rounded-full bg-tg-hint/40" />
-                    <span>{(user.briefs_count || user.briefs || 0)} briefs</span>
+                    <span>{(user.briefs_count || user.briefs || 0)} брифов</span>
                   </div>
                 </div>
               </div>
