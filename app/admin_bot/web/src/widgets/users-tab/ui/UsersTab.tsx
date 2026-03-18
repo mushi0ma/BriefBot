@@ -1,14 +1,45 @@
-import React from 'react';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+"use client";
+import React, { useState, useEffect } from 'react';
+import { useTelegram } from '@/src/shared/lib/telegram';
+import { LoadingState } from '@/src/shared/ui/states/LoadingState';
+import { ErrorState } from '@/src/shared/ui/states/ErrorState';
 import { Users, Crown, Globe, Search, MoreVertical, Filter } from 'lucide-react';
 
 export function UsersTab() {
-  const MOCK_USERS = [
-    { id: 1, name: 'Alex M.', username: '@alexm_dev', isPremium: true, briefs: 142, lastActive: '2m ago' },
-    { id: 2, name: 'Sarah J.', username: '@sarah_design', isPremium: false, briefs: 34, lastActive: '1h ago' },
-    { id: 3, name: 'Mike T.', username: '@miket_corp', isPremium: true, briefs: 89, lastActive: '3h ago' },
-    { id: 4, name: 'Elena V.', username: '@elena_v', isPremium: false, briefs: 12, lastActive: '1d ago' },
-    { id: 5, name: 'David B.', username: '@david_b', isPremium: true, briefs: 456, lastActive: '2d ago' },
-  ];
+  const { initData } = useTelegram();
+  const [data, setData] = useState<any>(null)
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        setLoading(true);
+        const res = await fetch('/api/stats', {
+          headers: {
+            'Authorization': `Bearer ${initData || window.Telegram?.WebApp?.initData || ''}`
+          }
+        });
+        if (!res.ok) throw new Error('Failed to fetch stats');
+        const json = await res.json();
+        setData(json);
+      } catch (err) {
+        console.error(err);
+        setError(true);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStats();
+  }, [initData]);
+
+  if (loading) return <LoadingState />;
+  if (error) return <ErrorState onRetry={() => window.location.reload()} />;
+
+  // Use recent users from API if available, else empty
+  const usersList = data?.recentUsers || [];
 
   return (
     <div className="space-y-6 pb-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
@@ -39,7 +70,7 @@ export function UsersTab() {
               <span className="text-[12px] font-bold uppercase tracking-wider">Premium Conversion</span>
             </div>
             <div className="flex items-end justify-between">
-              <h4 className="text-[28px] font-black text-tg-text">18.4%</h4>
+              <h4 className="text-[28px] font-black text-tg-text">{data?.totalUsers && data?.totalUsers > 0 ? Math.round((data.premiumUsers / data.totalUsers) * 100) : 0}%</h4>
               <span className="text-[11px] font-bold text-[#34C759] bg-[#34C759]/10 px-1.5 py-0.5 rounded flex items-center mb-1">
                 +2.1%
               </span>
@@ -73,15 +104,15 @@ export function UsersTab() {
         </div>
 
         <div className="bg-tg-bg rounded-2xl border border-tg-hint/10 shadow-sm overflow-hidden divide-y divide-tg-hint/10">
-          {MOCK_USERS.map((user) => (
+          {usersList.map((user: any) => (
             <div key={user.id} className="flex items-center p-4 hover:bg-tg-secondary-bg/30 transition-colors cursor-pointer group">
               <div className="relative shrink-0">
                 <img
-                  src={`https://api.dicebear.com/7.x/initials/svg?seed=${user.name}&backgroundColor=3e88f7,FF9500,AF52DE&textColor=ffffff`}
-                  alt={user.name}
+                  src={`https://api.dicebear.com/7.x/initials/svg?seed=${(user.first_name || user.name || "Unknown")}&backgroundColor=3e88f7,FF9500,AF52DE&textColor=ffffff`}
+                  alt={(user.first_name || user.name || "Unknown")}
                   className="w-11 h-11 rounded-full border border-tg-hint/10"
                 />
-                {user.isPremium && (
+                {(user.is_premium || user.isPremium) && (
                   <div className="absolute -bottom-1 -right-1 bg-[#FF9500] rounded-full p-0.5 border-2 border-tg-bg shadow-sm">
                     <Crown className="w-2.5 h-2.5 text-white" />
                   </div>
@@ -90,14 +121,14 @@ export function UsersTab() {
 
               <div className="ml-3 flex-1 min-w-0">
                 <div className="flex items-center justify-between mb-0.5">
-                  <h4 className="text-[16px] font-semibold text-tg-text truncate pr-2">{user.name}</h4>
-                  <span className="text-[12px] font-medium text-tg-hint shrink-0">{user.lastActive}</span>
+                  <h4 className="text-[16px] font-semibold text-tg-text truncate pr-2">{(user.first_name || user.name || "Unknown")}</h4>
+                  <span className="text-[12px] font-medium text-tg-hint shrink-0">{(user.lastActive || "Recently")}</span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <p className="text-[13px] text-tg-hint font-medium truncate">{user.username}</p>
+                  <p className="text-[13px] text-tg-hint font-medium truncate">{(user.username ? `@${user.username}` : "No username")}</p>
                   <div className="flex items-center gap-1 text-[12px] text-tg-hint font-medium">
                     <div className="w-1 h-1 rounded-full bg-tg-hint/40" />
-                    <span>{user.briefs} briefs</span>
+                    <span>{(user.briefs_count || user.briefs || 0)} briefs</span>
                   </div>
                 </div>
               </div>

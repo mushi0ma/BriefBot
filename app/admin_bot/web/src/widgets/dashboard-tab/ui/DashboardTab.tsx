@@ -1,7 +1,43 @@
-import React from 'react';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+"use client";
+import React, { useState, useEffect } from 'react';
+import { useTelegram } from '@/src/shared/lib/telegram';
+import { LoadingState } from '@/src/shared/ui/states/LoadingState';
+import { ErrorState } from '@/src/shared/ui/states/ErrorState';
 import { ArrowUpRight, CheckCircle2, AlertTriangle, TrendingUp, Download, Clock } from 'lucide-react';
 
 export function DashboardTab() {
+  const { initData } = useTelegram();
+  const [data, setData] = useState<any>(null)
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        setLoading(true);
+        const res = await fetch('/api/stats', {
+          headers: {
+            'Authorization': `Bearer ${initData || window.Telegram?.WebApp?.initData || ''}`
+          }
+        });
+        if (!res.ok) throw new Error('Failed to fetch stats');
+        const json = await res.json();
+        setData(json);
+      } catch (err) {
+        console.error(err);
+        setError(true);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStats();
+  }, [initData]);
+
+  if (loading) return <LoadingState />;
+  if (error) return <ErrorState onRetry={() => window.location.reload()} />;
+
   const KpiCard = ({ title, value, label, type }: { title: string, value: string, label: string, type: 'up' | 'down' | 'neutral' }) => (
     <div className="bg-tg-secondary-bg/50 backdrop-blur-sm rounded-2xl p-4 flex flex-col justify-between border border-tg-hint/10 shadow-sm min-w-[140px] flex-1">
       <div className="flex items-center justify-between mb-3">
@@ -24,9 +60,10 @@ export function DashboardTab() {
 
       {/* Top Level KPIs */}
       <section className="px-4 pt-4 flex gap-3 overflow-x-auto snap-x snap-mandatory scrollbar-hide">
-        <KpiCard title="Total Briefs" value="1,248" label="+14% this month" type="up" />
-        <KpiCard title="Active Users" value="842" label="Daily active metric" type="neutral" />
-        <KpiCard title="API Errors" value="12" label="-2 since yesterday" type="down" />
+        {/* Mock trend indicator as real backend currently provides only raw counts */}
+        <KpiCard title="Total Briefs" value={data?.totalBriefs?.toString() || "0"} label="All time" type="neutral" />
+        <KpiCard title="Total Users" value={data?.totalUsers?.toString() || "0"} label="Registered accounts" type="neutral" />
+        <KpiCard title="Premium Users" value={data?.premiumUsers?.toString() || "0"} label="Active subscriptions" type="up" />
       </section>
 
       {/* Generation Volume Chart */}
