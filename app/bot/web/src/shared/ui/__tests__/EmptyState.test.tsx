@@ -7,11 +7,11 @@ describe('EmptyState Component', () => {
     render(<EmptyState />);
     
     // Check if the heading is present
-    expect(screen.getByText('Здесь пока пусто')).toBeInTheDocument();
+    expect(screen.getByText('Your history is clear')).toBeInTheDocument();
     
     // Check if the descriptive paragraph is present
     expect(
-      screen.getByText('Отправьте боту аудиосообщение клиента, чтобы создать первый бриф!')
+      screen.getByText('Start by generating a professional brief. Your history and templates will appear here.')
     ).toBeInTheDocument();
   });
 });
