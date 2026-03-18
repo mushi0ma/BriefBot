@@ -10,7 +10,7 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Smoke Tests', () => {
   test('page loads with correct title', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/?tgWebAppStartParam=test');
     await expect(page).toHaveTitle(/BriefBot/);
   });
 
@@ -40,13 +40,13 @@ test.describe('Smoke Tests', () => {
       });
     });
 
-    await page.goto('/');
+    await page.goto('/?tgWebAppStartParam=test');
 
     // Wait for hydration
     await page.waitForLoadState('networkidle');
 
     // Tab bar should render
-    const tabs = page.locator('text=История, text=Настройки, text=Шаблоны');
+    const tabs = page.locator('nav button');
     await expect(page.getByText('История')).toBeVisible();
     await expect(page.getByText('Настройки')).toBeVisible();
     await expect(page.getByText('Шаблоны')).toBeVisible();
@@ -60,7 +60,7 @@ test.describe('Smoke Tests', () => {
       }
     });
 
-    await page.goto('/');
+    await page.goto('/?tgWebAppStartParam=test');
     await page.waitForLoadState('networkidle');
 
     const hydrationErrors = errors.filter(
@@ -83,7 +83,7 @@ test.describe('Smoke Tests', () => {
       }
     });
 
-    await page.goto('/');
+    await page.goto('/?tgWebAppStartParam=test');
     await page.waitForLoadState('networkidle');
 
     expect(corsErrors).toHaveLength(0);
@@ -101,7 +101,7 @@ test.describe('Smoke Tests', () => {
       }
     });
 
-    await page.goto('/');
+    await page.goto('/?tgWebAppStartParam=test');
     await page.waitForLoadState('networkidle');
 
     expect(notFound).toHaveLength(0);
@@ -118,7 +118,7 @@ test.describe('Smoke Tests', () => {
       }
     });
 
-    await page.goto('/');
+    await page.goto('/?tgWebAppStartParam=test');
     await page.waitForLoadState('networkidle');
 
     // All API calls should return 401 (no Telegram initData)
@@ -153,7 +153,7 @@ test.describe('Smoke Tests', () => {
       });
     });
 
-    await page.goto('/');
+    await page.goto('/?tgWebAppStartParam=test');
     await page.waitForLoadState('networkidle');
 
     // Click "Настройки" tab
@@ -173,7 +173,7 @@ test.describe('Smoke Tests', () => {
   });
 
   test('shows Access Denied outside Telegram', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/?tgWebAppStartParam=test');
     await page.waitForLoadState('networkidle');
     await expect(page.getByText('Только в Telegram')).toBeVisible();
   });
