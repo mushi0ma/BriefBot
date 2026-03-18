@@ -111,4 +111,59 @@ CREATE INDEX IF NOT EXISTS idx_history_data ON brief_history USING GIN (data);
 -- HNSW index for fast vector similarity search
 CREATE INDEX IF NOT EXISTS idx_history_embedding ON brief_history
   USING hnsw (embedding vector_cosine_ops);
+
+-- ── Admin Dashboard RPC ──────────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION get_dashboard_stats()
+RETURNS jsonb
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_total_briefs bigint;
+    v_active_users bigint;
+    v_api_errors bigint;
+    v_pdf_exports bigint;
+    v_saved_templates bigint;
+    v_avg_gen_time_ms numeric;
+    v_volume jsonb;
+BEGIN
+    SELECT count(*) INTO v_total_briefs FROM brief_history;
+    
+    -- Active users (seen/updated in last 14 days)
+    SELECT count(*) INTO v_active_users FROM users WHERE first_seen >= now() - interval '14 days' OR updated_at >= now() - interval '14 days';
+    
+    SELECT count(*) INTO v_api_errors FROM brief_history WHERE error_message != '';
+    SELECT count(*) INTO v_pdf_exports FROM brief_history WHERE pdf_url != '';
+    SELECT count(*) INTO v_saved_templates FROM templates;
+    SELECT COALESCE(avg(processing_time_ms), 0) INTO v_avg_gen_time_ms FROM brief_history WHERE processing_state = 'completed';
+
+    -- 7 day series (counts of briefs)
+    WITH dates AS (
+        SELECT generate_series(
+            date_trunc('day', now() - interval '6 days'),
+            date_trunc('day', now()),
+            '1 day'::interval
+        )::date AS day
+    ),
+    daily_counts AS (
+        SELECT 
+            d.day,
+            count(bh.id) as count
+        FROM dates d
+        LEFT JOIN brief_history bh ON date_trunc('day', bh.created_at)::date = d.day
+        GROUP BY d.day
+        ORDER BY d.day ASC
+    )
+    SELECT jsonb_agg(count) INTO v_volume FROM daily_counts;
+
+    RETURN jsonb_build_object(
+        'total_briefs', v_total_briefs,
+        'active_users', v_active_users,
+        'api_errors', v_api_errors,
+        'pdf_exports', v_pdf_exports,
+        'saved_templates', v_saved_templates,
+        'avg_gen_time_ms', v_avg_gen_time_ms,
+        'generation_volume', COALESCE(v_volume, '[]'::jsonb)
+    );
+END;
+$$ LANGUAGE plpgsql;
 """

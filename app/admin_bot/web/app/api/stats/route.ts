@@ -23,64 +23,29 @@ export async function GET(request: NextRequest) {
     try {
         const supabase = getSupabaseAdmin();
 
-        // Parallel queries for speed
-        const [
-            usersRes,
-            totalBriefsRes,
-            todayBriefsRes,
-            successBriefsRes,
-            failedBriefsRes,
-            recentBriefsRes,
-            topUsersRes,
-        ] = await Promise.all([
-            supabase.from("users").select("*", { count: "exact", head: true }),
-            supabase.from("brief_history").select("*", { count: "exact", head: true }),
-            supabase
-                .from("brief_history")
-                .select("*", { count: "exact", head: true })
-                .gte("created_at", `${new Date().toISOString().split("T")[0]}T00:00:00+00:00`),
-            supabase
-                .from("brief_history")
-                .select("*", { count: "exact", head: true })
-                .eq("processing_state", "done"),
-            supabase
-                .from("brief_history")
-                .select("*", { count: "exact", head: true })
-                .eq("processing_state", "failed"),
-            supabase
-                .from("brief_history")
-                .select("id, telegram_id, template_slug, processing_state, created_at, error_message")
-                .order("created_at", { ascending: false })
-                .limit(10),
-            supabase
-                .from("users")
-                .select("telegram_id, username, first_name, briefs_count")
-                .order("briefs_count", { ascending: false })
-                .limit(5),
-        ]);
+        // 1. Fetch dashboard stats via the new RPC function
+        const { data: statsData, error: statsError } = await supabase.rpc('get_dashboard_stats');
+        
+        if (statsError) {
+            console.error("[api/stats] RPC Error:", statsError);
+            throw new Error("Failed to fetch dashboard stats");
+        }
 
-        const totalUsers = usersRes.count ?? 0;
-        const totalBriefs = totalBriefsRes.count ?? 0;
-        const todayBriefs = todayBriefsRes.count ?? 0;
-        const successfulBriefs = successBriefsRes.count ?? 0;
-        const failedBriefs = failedBriefsRes.count ?? 0;
-
-        const successRate =
-            totalBriefs > 0
-                ? Math.round((successfulBriefs / totalBriefs) * 100)
-                : 0;
+        // 2. Fetch recent Top 50 Users for the UsersTab
+        const { data: usersData, error: usersError } = await supabase
+            .from("users")
+            .select("id, telegram_id, username, first_name, last_name, briefs_count, updated_at")
+            .order("briefs_count", { ascending: false })
+            .limit(50);
+            
+        if (usersError) {
+            console.error("[api/stats] Users Query Error:", usersError);
+            throw new Error("Failed to fetch recent users");
+        }
 
         return NextResponse.json({
-            users: { total: totalUsers },
-            briefs: {
-                total: totalBriefs,
-                today: todayBriefs,
-                successful: successfulBriefs,
-                failed: failedBriefs,
-                successRate,
-            },
-            recentBriefs: recentBriefsRes.data ?? [],
-            topUsers: topUsersRes.data ?? [],
+            stats: statsData, // total_briefs, active_users, api_errors, pdf_exports, saved_templates, avg_gen_time_ms, generation_volume
+            users: usersData, // array of users for the UsersTab
             timestamp: new Date().toISOString(),
         });
     } catch (err) {
