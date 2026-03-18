@@ -19,7 +19,7 @@ export const SegmentedControl: React.FC<SegmentedControlProps> = ({
   className = ""
 }) => {
   return (
-    <div className={`bg-slate-200/50 dark:bg-slate-800/80 p-1 rounded-xl flex w-full ${className}`}>
+    <div className={`bg-[var(--tg-theme-secondary-bg-color,#efeff3)] dark:bg-[var(--tg-theme-secondary-bg-color,#2c2c2e)] p-1 rounded-xl flex w-full ${className}`}>
       {segments.map((segment) => {
         const isActive = segment.id === activeSegment;
         return (
@@ -28,8 +28,8 @@ export const SegmentedControl: React.FC<SegmentedControlProps> = ({
             onClick={() => onChange(segment.id)}
             className={`flex-1 text-center py-2 px-3 rounded-lg text-sm font-semibold transition-all ${
               isActive
-                ? 'bg-primary text-white shadow-sm'
-                : 'text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700/50'
+                ? 'bg-[var(--tg-theme-button-color,#3e88f7)] text-[var(--tg-theme-button-text-color,#fff)] shadow-sm'
+                : 'text-[var(--tg-theme-hint-color,#98989e)] hover:bg-[var(--tg-theme-bg-color,#fff)]/50 dark:hover:bg-[var(--tg-theme-bg-color,#1c1c1e)]/50'
             }`}
           >
             {segment.label}

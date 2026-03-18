@@ -6,13 +6,13 @@ import { type Brief } from "@/src/entities/brief";
 import { type UserSettings } from "@/src/entities/user";
 import { type Tab } from "@/src/shared/ui";
 import { createApiFetch } from "@/src/shared/api";
-import { AlertCircle, RefreshCw } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { HistoryTab } from "@/src/widgets/history-tab";
 import { SettingsTab } from "@/src/widgets/settings-tab";
 import { TemplatesTab } from "@/src/widgets/templates-tab";
 import { ProfileHeader } from "@/src/widgets/profile-header";
-import { TopAppBar, BottomNavBar, type NavItem, LoadingState, AccessDeniedState } from "@/src/shared/ui";
+import { TopAppBar, BottomNavBar, type NavItem, LoadingState, AccessDeniedState, ErrorState } from "@/src/shared/ui";
 
 const tabVariants = {
   initial: { opacity: 0, y: 8 },
@@ -117,21 +117,12 @@ export default function Dashboard() {
             <LoadingState />
           </div>
         ) : error ? (
-          <div className="px-4 py-12 flex flex-col items-center gap-4 text-center animate-in">
-            <div className="w-12 h-12 rounded-xl bg-red-50 flex items-center justify-center border border-red-200">
-              <AlertCircle className="w-6 h-6 text-red-600" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-tg-text">Ошибка загрузки</p>
-              <p className="text-xs text-tg-hint mt-1">{error}</p>
-            </div>
-            <button
-              onClick={loadData}
-              className="flex items-center gap-2 px-4 py-2 rounded-md bg-tg-button text-tg-button-text text-sm font-medium shadow-sm transition-opacity hover:opacity-90"
-            >
-              <RefreshCw className="w-4 h-4" />
-              Повторить
-            </button>
+          <div className="animate-in">
+            <ErrorState
+              title="Ошибка загрузки"
+              message={error}
+              onRetry={loadData}
+            />
           </div>
         ) : (
           <AnimatePresence mode="wait">
