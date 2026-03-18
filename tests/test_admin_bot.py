@@ -1,8 +1,8 @@
 """Tests for the Admin Bot handlers (post-cleanup)."""
 
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
-from aiogram.types import Message, KeyboardButton, WebAppInfo
+from unittest.mock import AsyncMock, patch
+from aiogram.types import Message
 
 
 @pytest.mark.asyncio

@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import patch, MagicMock
 from app.worker.tasks import task_analyze_request, task_generate_pdf
 from app.models.brief import ProcessingState, ProcessingResult, BriefData
 

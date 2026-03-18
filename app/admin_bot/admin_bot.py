@@ -14,7 +14,6 @@ import httpx
 from aiogram import Bot, Dispatcher, Router, F
 from aiogram.filters import Command, CommandStart
 from aiogram.types import (
-    BufferedInputFile,
     CallbackQuery,
     InlineKeyboardButton,
     InlineKeyboardMarkup,

@@ -4,7 +4,7 @@ Supabase table schema definitions (for documentation & migration SQL generation)
 
 # Run this once in the Supabase SQL editor.
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 class UserSettings(BaseModel):
     """User preferences for brief generation and UI customization."""

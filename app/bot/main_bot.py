@@ -77,7 +77,7 @@ WELCOME_TEXT = (
 async def cmd_start(message: Message, state: FSMContext) -> None:
     """Welcome message with banner + SPA-style inline menu."""
     await state.clear()
-    settings = get_settings()
+    get_settings()
     await message.answer(
         WELCOME_TEXT,
         reply_markup=main_menu_keyboard(),
@@ -406,6 +406,7 @@ async def handle_voice(message: Message, bot: Bot, state: FSMContext) -> None:
 @router.callback_query(F.data.startswith("cancel:"))
 async def on_cancel_task(callback: CallbackQuery, bot: Bot, state: FSMContext) -> None:
     """Cancel a running Celery task."""
+    await callback.answer("Задача отменена.")
     task_id = callback.data.split(":", 1)[1]
 
     try:
@@ -418,7 +419,6 @@ async def on_cancel_task(callback: CallbackQuery, bot: Bot, state: FSMContext) -
         if processing_msg_id:
             await delete_sticker_safe(bot, callback.message.chat.id, processing_msg_id)
 
-        await callback.answer("Задача отменена.")
         await callback.message.edit_text(
             "❌ *Обработка отменена.*\n\n"
             "Отправьте новое голосовое или текстовое сообщение.",
@@ -427,7 +427,6 @@ async def on_cancel_task(callback: CallbackQuery, bot: Bot, state: FSMContext) -
         logger.info("task_cancelled", task_id=task_id)
     except Exception as e:
         logger.error("task_cancel_failed", task_id=task_id, error=str(e))
-        await callback.answer("Не удалось отменить задачу.")
 
 
 # ── Text: Draft Edit Handler ────────────────────────────────────────────────
@@ -544,7 +543,7 @@ async def handle_logo_upload(message: Message, state: FSMContext, bot: Bot) -> N
         Path(local_path).unlink(missing_ok=True)
 
         # 4. Save public URL in database
-        await UserRepo.update_branding(user_id, logo_url=public_url)
+        await UserRepo.update_settings(user_id, logo_url=public_url)
         await message.answer(
             "✅ *Логотип загружен!*\n\n"
             "Он будет использоваться в ваших PDF-брифах.",
@@ -603,6 +602,7 @@ async def handle_text(message: Message, state: FSMContext) -> None:
 @router.callback_query(F.data == "generate_brief")
 async def on_generate_brief(callback: CallbackQuery, state: FSMContext, bot: Bot) -> None:
     """Generate draft from collected text chunks, show for review."""
+    await callback.answer()
     user = callback.from_user
     user_id = user.id if user else 0
     chat_id = callback.message.chat.id
@@ -613,11 +613,10 @@ async def on_generate_brief(callback: CallbackQuery, state: FSMContext, bot: Bot
     text_buffer: list[str] = data.get("text_buffer", [])
 
     if not text_buffer:
-        await callback.answer("Нет текста для обработки. Отправьте сообщение.")
+        await bot.send_message(chat_id, "Нет текста для обработки. Отправьте сообщение.")
         return
 
     combined_text = "\n\n".join(text_buffer)
-    await callback.answer("Анализирую текст...")
 
     settings = get_settings()
     registry = StickerRegistry.from_settings(settings)
@@ -695,19 +694,18 @@ async def on_generate_brief(callback: CallbackQuery, state: FSMContext, bot: Bot
 @router.callback_query(F.data == "missing:fill")
 async def on_fill_missing_info(callback: CallbackQuery, state: FSMContext) -> None:
     """Enter text input mode for filling missing info."""
+    await callback.answer()
     data = await state.get_data()
     brief_data_dict = data.get("brief_data", {})
     missing = brief_data_dict.get("missing_info", "")
 
     await state.set_state(BriefState.filling_missing_info)
     await state.update_data(missing_field=missing)
-
-    await callback.answer()
     await send_temporary_sticker(callback.message, callback.message.chat.id, StickerRegistry.from_settings(get_settings()).MISSING_FIELDS)
-    parts = [f"✍ *Введите недостающую информацию:*\n"]
+    parts = ["✍ *Введите недостающую информацию:*\n"]
     for line in missing.split('\n'):
         parts.append(f"_{_escape_md2(line)}_")
-    parts.append(f"\nНапишите ваш ответ текстом:")
+    parts.append("\nНапишите ваш ответ текстом:")
 
     await callback.message.edit_text(
         "\n".join(parts),
@@ -732,6 +730,7 @@ async def on_skip_missing_info(callback: CallbackQuery, state: FSMContext) -> No
 @router.callback_query(F.data == "draft:generate_pdf")
 async def on_draft_generate_pdf(callback: CallbackQuery, state: FSMContext, bot: Bot) -> None:
     """Generate PDF from the approved draft."""
+    await callback.answer()
     user = callback.from_user
     user_id = user.id if user else 0
     chat_id = callback.message.chat.id
@@ -739,14 +738,12 @@ async def on_draft_generate_pdf(callback: CallbackQuery, state: FSMContext, bot:
     data = await state.get_data()
     brief_data_dict = data.get("brief_data")
     if not brief_data_dict:
-        await callback.answer("Нет данных для генерации PDF.")
+        await bot.send_message(chat_id, "Нет данных для генерации PDF.")
         return
 
     template_slug = data.get("template_slug", _user_templates.get(user_id, "default"))
     original_text = data.get("original_text", "")
     username = data.get("username")
-
-    await callback.answer("Генерирую PDF...")
     await callback.message.edit_text(
         "*Генерирую PDF-документ...*",
         parse_mode="Markdown",
@@ -782,7 +779,7 @@ async def on_draft_generate_pdf(callback: CallbackQuery, state: FSMContext, bot:
     )
 
     # Send result to user
-    settings = get_settings()
+    get_settings()
     if result.state == ProcessingState.DONE and result.pdf_path:
         summary_text = (
             f"*Бриф готов\!*\n\n"
@@ -830,8 +827,8 @@ async def on_draft_edit(callback: CallbackQuery, state: FSMContext) -> None:
 @router.callback_query(F.data == "draft:cancel")
 async def on_draft_cancel(callback: CallbackQuery, state: FSMContext) -> None:
     """Cancel the draft and reset FSM state."""
-    await state.clear()
     await callback.answer("Черновик отменён.")
+    await state.clear()
     await callback.message.edit_text(
         "Черновик отменён. Отправьте новое голосовое или текстовое сообщение."
     )
@@ -878,12 +875,12 @@ async def on_settings_color(callback: CallbackQuery) -> None:
 @router.callback_query(F.data.startswith("color:"))
 async def on_color_selected(callback: CallbackQuery) -> None:
     """Handle color selection."""
+    await callback.answer()
     color = callback.data.split(":", 1)[1]
     user_id = callback.from_user.id if callback.from_user else 0
 
     try:
-        await UserRepo.update_branding(user_id, brand_color=color)
-        await callback.answer(f"Цвет выбран: {color}")
+        await UserRepo.update_settings(user_id, brand_color=color)
         await callback.message.edit_text(
             f"✅ Цвет акцента обновлён: `{color}`\n\n"
             "Он будет применён в следующем PDF-брифе.",
@@ -924,17 +921,17 @@ async def on_settings_back(callback: CallbackQuery) -> None:
 @router.callback_query(F.data.startswith("feedback:"))
 async def on_feedback(callback: CallbackQuery) -> None:
     """Handle post-brief feedback."""
+    await callback.answer()
     action = callback.data.split(":", 1)[1]
     if action == "good":
-        await callback.answer("Спасибо за отзыв! 🎉")
+        pass
     elif action == "bad":
-        await callback.answer("Мы постараемся улучшить результат.")
+        pass
     elif action == "change_template":
         await callback.message.answer(
             "Выберите другой шаблон:",
             reply_markup=template_selection_keyboard(),
         )
-        await callback.answer()
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────

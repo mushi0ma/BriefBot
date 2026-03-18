@@ -20,7 +20,7 @@ def mock_orchestrator():
          patch("app.services.orchestrator.HistoryRepo") as mock_history_repo, \
          patch("app.services.orchestrator.get_template") as mock_get_template, \
          patch("app.services.orchestrator.notify_admin", new_callable=AsyncMock) as mock_notify, \
-         patch("app.services.orchestrator.upload_file", new_callable=AsyncMock, return_value="https://cdn.example.com/brief.pdf") as mock_upload, \
+         patch("app.services.orchestrator.upload_file", new_callable=AsyncMock, return_value="https://cdn.example.com/brief.pdf"), \
          patch("app.services.orchestrator.get_ai_agent") as mock_get_ai, \
          patch("app.services.orchestrator.get_cache") as mock_get_cache:
 

@@ -7,7 +7,6 @@ Registers graceful shutdown handlers for Redis storage.
 from __future__ import annotations
 
 import asyncio
-import signal
 import sys
 
 from aiogram import Dispatcher

@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock
 from aiogram.exceptions import TelegramBadRequest
 
 # These imports will fail initially because the module doesn't exist yet!

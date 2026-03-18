@@ -9,6 +9,7 @@ from typing import Any, Awaitable, Callable, Dict
 
 import redis.asyncio as aioredis
 from aiogram import BaseMiddleware
+import structlog
 from aiogram.types import TelegramObject, Update, Message
 
 from app.logger import get_logger, new_correlation_id
@@ -31,10 +32,12 @@ class LoggingMiddleware(BaseMiddleware):
 
         if isinstance(event, Update):
             user_id = None
+            chat_id = None
             update_type = "unknown"
 
             if event.message:
                 user_id = event.message.from_user.id if event.message.from_user else None
+                chat_id = event.message.chat.id
                 if event.message.voice:
                     update_type = "voice"
                 elif event.message.audio:
@@ -45,12 +48,14 @@ class LoggingMiddleware(BaseMiddleware):
                     update_type = "message"
             elif event.callback_query:
                 user_id = event.callback_query.from_user.id if event.callback_query.from_user else None
+                chat_id = event.callback_query.message.chat.id if event.callback_query.message else None
                 update_type = "callback_query"
+
+            structlog.contextvars.bind_contextvars(user_id=user_id, chat_id=chat_id)
 
             logger.info(
                 "incoming_update",
                 update_id=event.update_id,
-                user_id=user_id,
                 update_type=update_type,
                 correlation_id=cid,
             )

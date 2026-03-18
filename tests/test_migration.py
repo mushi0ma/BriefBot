@@ -3,7 +3,6 @@ Tests for database migration SQL — ensures all required schema elements
 are present in the idempotent migration script.
 """
 
-import pytest
 
 from app.models.db import MIGRATION_SQL
 

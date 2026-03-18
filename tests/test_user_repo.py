@@ -1,6 +1,6 @@
 """
 Tests for app.db.user_repo — UserRepo CRUD operations.
-Covers: get_or_create (upsert), increment_briefs, update_branding.
+Covers: get_or_create (upsert), increment_briefs, update_settings.
 """
 
 from __future__ import annotations
@@ -92,29 +92,29 @@ class TestUserRepoIncrementBriefs:
         mock_sb.table.return_value.update.assert_called_once_with({"briefs_count": 6})
 
 
-class TestUserRepoUpdateBranding:
-    """Test UserRepo.update_branding behavior."""
+class TestUserRepoUpdateSettings:
+    """Test UserRepo.update_settings behavior."""
 
     @pytest.mark.asyncio
     @patch("app.db.user_repo.get_supabase")
-    async def test_update_branding_sends_only_provided_fields(self, mock_get_sb):
+    async def test_update_settings_sends_only_provided_fields(self, mock_get_sb):
         """Should only update fields that are provided (not None)."""
         mock_sb = MagicMock()
         mock_get_sb.return_value = mock_sb
 
         from app.db.user_repo import UserRepo
-        await UserRepo.update_branding(123, brand_color="#FF0000")
+        await UserRepo.update_settings(123, brand_color="#FF0000")
 
         mock_sb.table.return_value.update.assert_called_once_with({"brand_color": "#FF0000"})
 
     @pytest.mark.asyncio
     @patch("app.db.user_repo.get_supabase")
-    async def test_update_branding_skips_if_no_fields(self, mock_get_sb):
+    async def test_update_settings_skips_if_no_fields(self, mock_get_sb):
         """Should not call update if no fields are provided."""
         mock_sb = MagicMock()
         mock_get_sb.return_value = mock_sb
 
         from app.db.user_repo import UserRepo
-        await UserRepo.update_branding(123)
+        await UserRepo.update_settings(123)
 
         mock_sb.table.return_value.update.assert_not_called()
