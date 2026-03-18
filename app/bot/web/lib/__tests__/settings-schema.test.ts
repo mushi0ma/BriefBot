@@ -16,6 +16,12 @@ describe('SettingsPatchSchema — Input Validation', () => {
       default_template: 'minimal',
       include_assessment: false,
       include_summary: true,
+      watermark_on_pdf: false,
+      include_cover_page: true,
+      page_numbering: true,
+      base_font_size: 14,
+      paper_size: 'Letter',
+      language: 'en'
     });
     expect(result.success).toBe(true);
   });

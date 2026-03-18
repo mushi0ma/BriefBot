@@ -27,6 +27,12 @@ export const SettingsPatchSchema = z.object({
   include_summary: z.boolean().optional(),
   include_competitors: z.boolean().optional(),
   include_tone: z.boolean().optional(),
+  watermark_on_pdf: z.boolean().optional(),
+  include_cover_page: z.boolean().optional(),
+  page_numbering: z.boolean().optional(),
+  base_font_size: z.number().int().min(8).max(36).optional(),
+  paper_size: z.string().optional(),
+  language: z.string().optional(),
 }).strict();
 
 export type SettingsPatch = z.infer<typeof SettingsPatchSchema>;

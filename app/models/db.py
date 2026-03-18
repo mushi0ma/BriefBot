@@ -16,6 +16,12 @@ class UserSettings(BaseModel):
     include_summary: bool = True
     include_competitors: bool = True
     include_tone: bool = True
+    watermark_on_pdf: bool = True
+    include_cover_page: bool = True
+    page_numbering: bool = True
+    base_font_size: int = 12
+    paper_size: str = "A4"
+    language: str = "ru"
 
 MIGRATION_SQL = """
 -- ── Users ────────────────────────────────────────────────────────────────
@@ -40,6 +46,12 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS include_keywords BOOLEAN DEFAULT true
 ALTER TABLE users ADD COLUMN IF NOT EXISTS include_summary BOOLEAN DEFAULT true;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS include_competitors BOOLEAN DEFAULT true;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS include_tone BOOLEAN DEFAULT true;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS watermark_on_pdf BOOLEAN DEFAULT true;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS include_cover_page BOOLEAN DEFAULT true;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS page_numbering BOOLEAN DEFAULT true;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS base_font_size INTEGER DEFAULT 12;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS paper_size TEXT DEFAULT 'A4';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS language TEXT DEFAULT 'ru';
 
 -- ── Brief History ────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS brief_history (

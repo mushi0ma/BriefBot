@@ -112,6 +112,12 @@ class UserRepo:
         include_summary: bool | None = None,
         include_competitors: bool | None = None,
         include_tone: bool | None = None,
+        watermark_on_pdf: bool | None = None,
+        include_cover_page: bool | None = None,
+        page_numbering: bool | None = None,
+        base_font_size: int | None = None,
+        paper_size: str | None = None,
+        language: str | None = None,
     ) -> None:
         """Update user branding and customization settings."""
 
@@ -135,6 +141,18 @@ class UserRepo:
                 update_data["include_competitors"] = include_competitors
             if include_tone is not None:
                 update_data["include_tone"] = include_tone
+            if watermark_on_pdf is not None:
+                update_data["watermark_on_pdf"] = watermark_on_pdf
+            if include_cover_page is not None:
+                update_data["include_cover_page"] = include_cover_page
+            if page_numbering is not None:
+                update_data["page_numbering"] = page_numbering
+            if base_font_size is not None:
+                update_data["base_font_size"] = base_font_size
+            if paper_size is not None:
+                update_data["paper_size"] = paper_size
+            if language is not None:
+                update_data["language"] = language
             if update_data:
                 sb.table(UserRepo.TABLE).update(update_data).eq("telegram_id", telegram_id).execute()
                 logger.info("user_settings_updated", telegram_id=telegram_id, fields=list(update_data.keys()))
