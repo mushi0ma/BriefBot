@@ -1,14 +1,61 @@
-import React from 'react';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+"use client";
+import React, { useState, useEffect } from 'react';
+import { useTelegram } from '@/src/shared/lib/telegram';
+import { LoadingState } from '@/src/shared/ui/states/LoadingState';
+import { ErrorState } from '@/src/shared/ui/states/ErrorState';
 import { Activity, Server, Database, Cloud, ShieldCheck, Zap, AlertCircle } from 'lucide-react';
 
 export function HealthTab() {
-  const MOCK_SERVICES = [
-    { name: 'API Gateway', status: 'operational', uptime: '99.99%', latency: '42ms', icon: <Server className="w-5 h-5 text-[var(--tg-theme-button-color,#3e88f7)]" /> },
-    { name: 'PostgreSQL DB', status: 'operational', uptime: '100%', latency: '8ms', icon: <Database className="w-5 h-5 text-[#34C759]" /> },
-    { name: 'Redis Cache', status: 'degraded', uptime: '98.5%', latency: '120ms', icon: <Zap className="w-5 h-5 text-[#FF9500]" /> },
-    { name: 'PDF Generator', status: 'operational', uptime: '99.9%', latency: '850ms', icon: <Cloud className="w-5 h-5 text-[var(--tg-theme-button-color,#3e88f7)]" /> },
-    { name: 'Auth Service', status: 'operational', uptime: '100%', latency: '12ms', icon: <ShieldCheck className="w-5 h-5 text-[#34C759]" /> },
-  ];
+  const { initData } = useTelegram();
+  const [data, setData] = useState<any>(null)
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    const fetchHealth = async () => {
+      try {
+        setLoading(true);
+        const res = await fetch('/api/health', {
+          headers: {
+            'Authorization': `Bearer ${initData || window.Telegram?.WebApp?.initData || ''}`
+          }
+        });
+        if (!res.ok) throw new Error('Failed to fetch health data');
+        const json = await res.json();
+        setData(json);
+      } catch (err) {
+        console.error(err);
+        setError(true);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchHealth();
+  }, [initData]);
+
+  if (loading) return <LoadingState />;
+  if (error) return <ErrorState onRetry={() => window.location.reload()} />;
+
+
+  const getIconForService = (name: string) => {
+    const lowerName = name.toLowerCase();
+    if (lowerName.includes('db') || lowerName.includes('database')) return <Database className="w-5 h-5" />;
+    if (lowerName.includes('redis') || lowerName.includes('cache')) return <Zap className="w-5 h-5" />;
+    if (lowerName.includes('auth')) return <ShieldCheck className="w-5 h-5" />;
+    if (lowerName.includes('pdf')) return <Cloud className="w-5 h-5" />;
+    return <Server className="w-5 h-5" />;
+  };
+
+  // Convert API object to array. Assumes API returns { status: 'ok', services: { db: { status: 'operational', latency: '...' }, ... } }
+  const servicesList = data?.services ? Object.entries(data.services).map(([key, val]: [string, any]) => ({
+    name: val.name || key,
+    status: val.status || 'unknown',
+    uptime: val.uptime || 'N/A',
+    latency: val.latency || 'N/A',
+    icon: getIconForService(val.name || key)
+  })) : [];
 
   const getStatusColor = (status: string) => {
     switch(status) {
@@ -40,7 +87,7 @@ export function HealthTab() {
               <div className="absolute inset-0 rounded-full border border-[#34C759]/30 animate-[ping_3s_cubic-bezier(0,0,0.2,1)_infinite]" />
             </div>
             <div>
-              <h2 className="text-[20px] font-bold text-tg-text tracking-tight">All Systems Operational</h2>
+              <h2 className="text-[20px] font-bold text-tg-text tracking-tight">{data?.status === "ok" ? "All Systems Operational" : "System Degraded"}</h2>
               <p className="text-[13px] font-medium text-tg-hint mt-0.5">Updated just now</p>
             </div>
           </div>
@@ -65,7 +112,7 @@ export function HealthTab() {
         <h3 className="text-[15px] font-bold text-tg-hint uppercase tracking-wider mb-3 ml-2">Core Services</h3>
         <div className="bg-tg-bg rounded-2xl border border-tg-hint/10 shadow-sm overflow-hidden divide-y divide-tg-hint/10">
 
-          {MOCK_SERVICES.map((service, index) => (
+          {servicesList.map((service: any, index: number) => (
             <div key={index} className="p-4 flex items-center gap-4 hover:bg-tg-secondary-bg/30 transition-colors">
               <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 border ${getStatusBg(service.status)}`}>
                 {service.icon}
