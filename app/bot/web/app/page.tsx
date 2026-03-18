@@ -27,6 +27,8 @@ export default function Dashboard() {
   const [briefs, setBriefs] = useState<Brief[]>([]);
   const [settings, setSettings] = useState<UserSettings>({
     brand_color: null, logo_url: null, default_template: null,
+    watermark_on_pdf: null, include_cover_page: null, page_numbering: null,
+    base_font_size: null, paper_size: null, language: null,
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -48,7 +50,17 @@ export default function Dashboard() {
     ])
       .then(([h, s]) => {
         setBriefs(h.briefs ?? []);
-        setSettings({ brand_color: s.brand_color ?? null, logo_url: s.logo_url ?? null, default_template: s.default_template ?? null });
+        setSettings({
+          brand_color: s.brand_color ?? null,
+          logo_url: s.logo_url ?? null,
+          default_template: s.default_template ?? null,
+          watermark_on_pdf: s.watermark_on_pdf ?? null,
+          include_cover_page: s.include_cover_page ?? null,
+          page_numbering: s.page_numbering ?? null,
+          base_font_size: s.base_font_size ?? null,
+          paper_size: s.paper_size ?? null,
+          language: s.language ?? null,
+        });
       })
       .catch((e) => {
         console.error(e);
