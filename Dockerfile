@@ -8,6 +8,7 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel
 
 # Copy project manifest and install dependencies into a virtual env
 COPY pyproject.toml .
+COPY app/ app/
 RUN python -m venv /opt/venv && \
     /opt/venv/bin/pip install --no-cache-dir . && \
     /opt/venv/bin/pip install --no-cache-dir packaging
