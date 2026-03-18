@@ -21,7 +21,7 @@ export async function GET(request: Request) {
         const sb = getSupabaseAdmin();
         const { data, error } = await sb
             .from("users")
-            .select("brand_color, logo_url, default_template, include_assessment, include_keywords, include_summary, include_competitors, include_tone")
+            .select("brand_color, logo_url, default_template, include_assessment, include_keywords, include_summary, include_competitors, include_tone, watermark_on_pdf, include_cover_page, page_numbering, base_font_size, paper_size, language")
             .eq("telegram_id", user.id)
             .limit(1)
             .single();
@@ -36,7 +36,13 @@ export async function GET(request: Request) {
                     include_keywords: true,
                     include_summary: true,
                     include_competitors: true,
-                    include_tone: true
+                    include_tone: true,
+                    watermark_on_pdf: true,
+                    include_cover_page: true,
+                    page_numbering: true,
+                    base_font_size: 12,
+                    paper_size: "A4",
+                    language: "ru"
                 }
             );
         }
