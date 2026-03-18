@@ -61,9 +61,9 @@ export function DashboardTab() {
       {/* Top Level KPIs */}
       <section className="px-4 pt-4 flex gap-3 overflow-x-auto snap-x snap-mandatory scrollbar-hide">
         {/* Mock trend indicator as real backend currently provides only raw counts */}
-        <KpiCard title="Total Briefs" value={data?.totalBriefs?.toString() || "0"} label="All time" type="neutral" />
-        <KpiCard title="Total Users" value={data?.totalUsers?.toString() || "0"} label="Registered accounts" type="neutral" />
-        <KpiCard title="Premium Users" value={data?.premiumUsers?.toString() || "0"} label="Active subscriptions" type="up" />
+        <KpiCard title="Всего брифов" value={data?.totalBriefs?.toString() || "0"} label="За все время" type="neutral" />
+        <KpiCard title="Всего пользователей" value={data?.totalUsers?.toString() || "0"} label="Зарегистрировано" type="neutral" />
+        <KpiCard title="Premium пользователи" value={data?.premiumUsers?.toString() || "0"} label="Активные подписки" type="up" />
       </section>
 
       {/* Generation Volume Chart */}
@@ -75,8 +75,8 @@ export function DashboardTab() {
           <div className="relative z-10">
             <div className="flex justify-between items-end mb-6">
               <div>
-                <h3 className="text-[16px] font-bold text-tg-text">Brief Generation Volume</h3>
-                <p className="text-[13px] text-tg-hint font-medium">Last 7 days</p>
+                <h3 className="text-[16px] font-bold text-tg-text">Объем генераций брифов</h3>
+                <p className="text-[13px] text-tg-hint font-medium">За последние 7 дней</p>
               </div>
               <div className="bg-[#34C759]/10 text-[#34C759] text-[12px] font-bold px-2 py-1 rounded-md flex items-center gap-1">
                 <ArrowUpRight className="w-3 h-3" />
@@ -86,7 +86,7 @@ export function DashboardTab() {
 
             {/* Mocked Bar Chart using Flexbox */}
             <div className="flex items-end justify-between h-[120px] gap-2 pt-4">
-              {[40, 70, 45, 90, 65, 80, 100].map((height, i) => (
+              {(data?.weeklyStats || [0, 0, 0, 0, 0, 0, 0]).map((height: number, i: number) => (
                 <div key={i} className="flex flex-col items-center flex-1 gap-2 group">
                   <div className="w-full relative flex items-end h-full">
                     <div
@@ -98,7 +98,7 @@ export function DashboardTab() {
                     </div>
                   </div>
                   <span className="text-[11px] font-medium text-tg-hint">
-                    {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][i]}
+                    {['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'][i]}
                   </span>
                 </div>
               ))}
@@ -109,7 +109,7 @@ export function DashboardTab() {
 
       {/* Feature Usage Stats */}
       <section className="px-4">
-        <h3 className="text-[15px] font-bold text-tg-hint uppercase tracking-wider mb-3 ml-2">Feature Adoption</h3>
+        <h3 className="text-[15px] font-bold text-tg-hint uppercase tracking-wider mb-3 ml-2">Использование функций</h3>
         <div className="bg-tg-bg rounded-2xl border border-tg-hint/10 shadow-sm overflow-hidden divide-y divide-tg-hint/10">
 
           <div className="p-4 flex items-center gap-4 hover:bg-tg-secondary-bg/30 transition-colors">
@@ -118,7 +118,7 @@ export function DashboardTab() {
             </div>
             <div className="flex-1">
               <div className="flex justify-between items-center mb-1">
-                <span className="text-[16px] font-semibold text-tg-text">PDF Exports</span>
+                <span className="text-[16px] font-semibold text-tg-text">Экспорт в PDF</span>
                 <span className="text-[14px] font-bold text-tg-text">8,421</span>
               </div>
               <div className="w-full h-1.5 bg-tg-hint/20 rounded-full overflow-hidden">
@@ -133,7 +133,7 @@ export function DashboardTab() {
             </div>
             <div className="flex-1">
               <div className="flex justify-between items-center mb-1">
-                <span className="text-[16px] font-semibold text-tg-text">Saved Templates</span>
+                <span className="text-[16px] font-semibold text-tg-text">Сохраненные шаблоны</span>
                 <span className="text-[14px] font-bold text-tg-text">3,190</span>
               </div>
               <div className="w-full h-1.5 bg-tg-hint/20 rounded-full overflow-hidden">
@@ -148,7 +148,7 @@ export function DashboardTab() {
             </div>
             <div className="flex-1">
               <div className="flex justify-between items-center mb-1">
-                <span className="text-[16px] font-semibold text-tg-text">Avg. Gen Time</span>
+                <span className="text-[16px] font-semibold text-tg-text">Ср. время генерации</span>
                 <span className="text-[14px] font-bold text-tg-text">4.2s</span>
               </div>
               <div className="w-full h-1.5 bg-tg-hint/20 rounded-full overflow-hidden">

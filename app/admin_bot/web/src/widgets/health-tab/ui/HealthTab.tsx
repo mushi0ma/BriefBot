@@ -87,8 +87,8 @@ export function HealthTab() {
               <div className="absolute inset-0 rounded-full border border-[#34C759]/30 animate-[ping_3s_cubic-bezier(0,0,0.2,1)_infinite]" />
             </div>
             <div>
-              <h2 className="text-[20px] font-bold text-tg-text tracking-tight">{data?.status === "ok" ? "All Systems Operational" : "System Degraded"}</h2>
-              <p className="text-[13px] font-medium text-tg-hint mt-0.5">Updated just now</p>
+              <h2 className="text-[20px] font-bold text-tg-text tracking-tight">{data?.status === "ok" ? "Все системы работают" : "Работа системы нарушена"}</h2>
+              <p className="text-[13px] font-medium text-tg-hint mt-0.5">Обновлено только что</p>
             </div>
           </div>
         </div>
@@ -99,7 +99,7 @@ export function HealthTab() {
         <div className="bg-[#FF9500]/10 border border-[#FF9500]/20 rounded-2xl p-4 flex gap-3 shadow-sm">
           <AlertCircle className="w-5 h-5 text-[#FF9500] shrink-0 mt-0.5" />
           <div>
-            <h4 className="text-[14px] font-bold text-[#FF9500] mb-1">Redis Cache Degraded Performance</h4>
+            <h4 className="text-[14px] font-bold text-[#FF9500] mb-1">Снижение производительности Redis Cache</h4>
             <p className="text-[13px] font-medium text-tg-hint/80 text-[#FF9500]/80">
               Experiencing elevated latency spikes during peak load. Auto-scaling initiated.
             </p>
@@ -109,7 +109,7 @@ export function HealthTab() {
 
       {/* Service Health List */}
       <section className="px-4">
-        <h3 className="text-[15px] font-bold text-tg-hint uppercase tracking-wider mb-3 ml-2">Core Services</h3>
+        <h3 className="text-[15px] font-bold text-tg-hint uppercase tracking-wider mb-3 ml-2">Основные сервисы</h3>
         <div className="bg-tg-bg rounded-2xl border border-tg-hint/10 shadow-sm overflow-hidden divide-y divide-tg-hint/10">
 
           {servicesList.map((service: any, index: number) => (
@@ -130,12 +130,12 @@ export function HealthTab() {
                 <div className="flex items-center justify-between mt-2">
                   <div className="flex items-center gap-4">
                     <div className="flex flex-col">
-                      <span className="text-[10px] font-semibold text-tg-hint uppercase tracking-wider">Uptime</span>
+                      <span className="text-[10px] font-semibold text-tg-hint uppercase tracking-wider">Аптайм</span>
                       <span className="text-[13px] font-bold text-tg-text">{service.uptime}</span>
                     </div>
                     <div className="w-px h-6 bg-tg-hint/20" />
                     <div className="flex flex-col">
-                      <span className="text-[10px] font-semibold text-tg-hint uppercase tracking-wider">Latency</span>
+                      <span className="text-[10px] font-semibold text-tg-hint uppercase tracking-wider">Задержка</span>
                       <span className="text-[13px] font-bold text-tg-text">{service.latency}</span>
                     </div>
                   </div>

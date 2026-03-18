@@ -40,7 +40,9 @@ export function AccessDeniedState() {
         {/* Actions */}
         <div className="w-full space-y-4">
           <a
-            href="https://t.me/"
+            href={`https://t.me/${process.env.NEXT_PUBLIC_BOT_USERNAME || 'BriefKzBot'}`}
+            target="_blank"
+            rel="noopener noreferrer"
             className="w-full bg-tg-button hover:opacity-90 text-tg-button-text font-bold py-4 rounded-xl transition-opacity flex items-center justify-center gap-2"
           >
             <span className="material-symbols-outlined text-xl">

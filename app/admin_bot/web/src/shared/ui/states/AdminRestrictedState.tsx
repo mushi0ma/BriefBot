@@ -1,58 +1,97 @@
 import React from 'react';
-import { Lock, AlertOctagon } from 'lucide-react';
 
 export function AdminRestrictedState() {
+  const handleReturn = () => {
+    if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
+      window.Telegram.WebApp.close();
+    }
+  };
+
+  const handleSupport = () => {
+    // Assuming support URL might be standard, or just open bot
+    const botUsername = process.env.NEXT_PUBLIC_BOT_USERNAME || 'BriefKzBot';
+    const supportUrl = `https://t.me/${botUsername}`;
+
+    if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
+      (window.Telegram.WebApp as unknown as { openTelegramLink: (url: string) => void }).openTelegramLink(supportUrl);
+    } else if (typeof window !== 'undefined') {
+        window.open(supportUrl, '_blank');
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-[100] bg-[#1C1C1E] flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-500">
+    <div className="bg-tg-bg font-sans text-tg-text min-h-screen flex flex-col p-6 animate-in fade-in duration-300 relative overflow-hidden">
 
-      {/* Red Pulse Background Glow */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] bg-red-500/20 rounded-full blur-[100px] pointer-events-none" />
-
-      {/* Center Icon Group */}
-      <div className="relative mb-8 z-10">
-        <div className="w-24 h-24 rounded-full bg-[#2C2C2E] border-4 border-[#3A3A3C] shadow-2xl flex items-center justify-center relative overflow-hidden">
-          <AlertOctagon className="w-12 h-12 text-[#FF453A]" strokeWidth={1.5} />
-        </div>
-        <div className="absolute -bottom-2 -right-2 w-10 h-10 bg-[#FF453A] rounded-full border-4 border-[#1C1C1E] flex items-center justify-center shadow-lg transform rotate-12">
-          <Lock className="w-5 h-5 text-white" strokeWidth={2.5} />
-        </div>
+      {/* Top Bar Area */}
+      <div className="flex items-center justify-between mb-8 w-full max-w-md mx-auto relative z-20">
+        <button
+          onClick={handleReturn}
+          className="p-2 -ml-2 text-tg-button hover:bg-tg-button/10 rounded-full transition-colors active:scale-95 flex items-center justify-center"
+          aria-label="Back"
+        >
+          <span className="material-symbols-outlined text-[28px]">
+            arrow_back
+          </span>
+        </button>
+        <h1 className="text-[17px] font-semibold tracking-tight absolute left-1/2 -translate-x-1/2">
+          Access Denied
+        </h1>
+        <div className="w-10" /> {/* Spacer for centering */}
       </div>
 
-      <h1 className="text-[28px] font-bold text-white tracking-tight mb-3 z-10 relative">
-        Доступ Запрещен
-      </h1>
+      <div className="max-w-md w-full flex-1 flex flex-col items-center justify-center mx-auto pb-20 relative z-20">
 
-      <p className="text-[16px] text-[#8E8E93] leading-relaxed max-w-[280px] font-medium mb-10 z-10 relative">
-        Этот раздел предназначен исключительно для администраторов системы.
-        <br/><br/>
-        Пожалуйста, закройте это окно и вернитесь к основному боту.
-      </p>
+        {/* Background Glow */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-[60%] w-[350px] h-[350px] bg-tg-button/5 rounded-full blur-[60px] pointer-events-none" />
 
-      {/* Telegram Main Button Simulator */}
-      <button
-        onClick={() => {
-          if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
-            window.Telegram.WebApp.close();
-          }
-        }}
-        className="w-full max-w-[320px] bg-[#FF453A] hover:bg-[#FF3B30] text-white font-bold py-4 rounded-xl text-[17px] shadow-[0_4px_14px_0_rgba(255,69,58,0.39)] transition-all active:scale-[0.98] z-10 relative"
-      >
-        Вернуться назад
-      </button>
+        {/* Icon Container */}
+        <div className="relative mb-12 z-10">
+          <div className="w-[160px] h-[160px] rounded-full border-[1px] border-tg-hint/10 flex items-center justify-center relative overflow-hidden bg-tg-secondary-bg/20">
+             <span
+              className="material-symbols-outlined text-tg-button text-[80px] select-none"
+              style={{ fontVariationSettings: "'FILL' 1" }}
+            >
+              shield_lock
+            </span>
+          </div>
+          <div className="absolute bottom-2 right-2 w-[52px] h-[52px] bg-tg-button rounded-full border-[4px] border-tg-bg flex items-center justify-center shadow-lg">
+            <span
+              className="material-symbols-outlined text-white text-[28px]"
+              style={{ fontVariationSettings: "'FILL' 1" }}
+            >
+              admin_panel_settings
+            </span>
+          </div>
+        </div>
 
-      <div className="absolute bottom-10 flex items-center gap-1.5 opacity-40">
-        <ShieldLogo />
-        <span className="text-[12px] font-semibold text-white tracking-widest uppercase">Admin Security</span>
+        {/* Title */}
+        <h2 className="text-[24px] font-bold text-tg-text tracking-tight mb-4 z-10 relative text-center">
+          Admin Access Required
+        </h2>
+
+        {/* Description */}
+        <p className="text-[15px] text-tg-hint leading-relaxed max-w-[280px] text-center mb-12 z-10 relative">
+          This section is reserved for administrators only. If you believe this is an error, contact support.
+        </p>
+
+        {/* Actions */}
+        <div className="w-full space-y-3 z-10 relative mt-auto">
+          <button
+            onClick={handleReturn}
+            className="w-full bg-tg-button hover:opacity-90 text-tg-button-text font-semibold py-[14px] rounded-xl text-[16px] transition-all active:scale-[0.98]"
+          >
+            Return to App
+          </button>
+
+          <button
+            onClick={handleSupport}
+            className="w-full bg-tg-secondary-bg hover:bg-tg-hint/20 text-tg-button font-semibold py-[14px] rounded-xl text-[16px] transition-all active:scale-[0.98]"
+          >
+            Contact Support
+          </button>
+        </div>
+
       </div>
-
     </div>
-  );
-}
-
-function ShieldLogo() {
-  return (
-    <svg width="14" height="16" viewBox="0 0 14 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M7 0L0 3.11111V7.77778C0 11.8533 2.99444 15.6578 7 16C11.0056 15.6578 14 11.8533 14 7.77778V3.11111L7 0ZM7 3.55556L11.6667 5.62667V7.77778C11.6667 10.7022 9.53556 13.4156 7 14.2867C4.46444 13.4156 2.33333 10.7022 2.33333 7.77778V5.62667L7 3.55556ZM5.44444 8.55556L4.03667 7.14778L3.21222 7.97222L5.44444 10.2044L10.1111 5.53778L9.28667 4.71333L5.44444 8.55556Z" fill="white"/>
-    </svg>
   );
 }
