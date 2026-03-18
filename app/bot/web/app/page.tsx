@@ -61,7 +61,7 @@ export default function Dashboard() {
     loadData();
   }, [loadData]);
 
-  const updateSetting = async (field: string, value: string | boolean) => {
+  const updateSetting = async (field: string, value: string | boolean | number) => {
     setSaving(true);
     setSaveError(null);
     try {
