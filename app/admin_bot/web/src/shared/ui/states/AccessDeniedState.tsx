@@ -1,8 +1,20 @@
-import React from 'react';
+"use client";
+import React, { useState } from 'react';
 
 export function AccessDeniedState() {
+  const [copied, setCopied] = useState(false);
   const botUsername = process.env.NEXT_PUBLIC_BOT_USERNAME || 'BriefKzBot';
-  const botUrl = `tg://resolve?domain=${botUsername}`;
+  const httpsUrl = `https://t.me/${botUsername}`;
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(httpsUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy text: ', err);
+    }
+  };
 
   return (
     <div className="bg-tg-bg font-sans text-tg-text min-h-screen flex flex-col items-center justify-center p-6">
@@ -40,7 +52,7 @@ export function AccessDeniedState() {
         {/* Actions */}
         <div className="w-full space-y-4">
           <a
-            href={`https://t.me/${process.env.NEXT_PUBLIC_BOT_USERNAME || 'BriefKzBot'}`}
+            href={httpsUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="w-full bg-tg-button hover:opacity-90 text-tg-button-text font-bold py-4 rounded-xl transition-opacity flex items-center justify-center gap-2"
@@ -52,15 +64,13 @@ export function AccessDeniedState() {
           </a>
 
           <button
-            onClick={() => {
-                window.location.href = botUrl;
-            }}
+            onClick={handleCopy}
             className="w-full bg-tg-button/10 hover:bg-tg-button/20 text-tg-button font-semibold py-4 rounded-xl transition-colors flex items-center justify-center gap-2"
           >
             <span className="material-symbols-outlined text-xl">
-              content_copy
+              {copied ? 'check' : 'content_copy'}
             </span>
-            Скопировать ссылку
+            {copied ? 'Скопировано!' : 'Скопировать ссылку'}
           </button>
         </div>
 
