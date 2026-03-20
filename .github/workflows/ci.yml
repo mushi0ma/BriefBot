@@ -48,6 +48,17 @@ jobs:
           cache-dependency-path: app/bot/web/package-lock.json
 
       - run: npm ci
+
+      - name: Cache Next.js
+        uses: actions/cache@v4
+        with:
+          path: |
+            app/bot/web/.next/cache
+            app/admin_bot/web/.next/cache
+          key: ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/*.js', '**/*.jsx', '**/*.ts', '**/*.tsx') }}
+          restore-keys: |
+            ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json') }}-
+
       - run: npm run build
 
   e2e:
@@ -69,8 +80,26 @@ jobs:
 
       - run: npm ci
 
+      - name: Cache Playwright Browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('app/bot/web/package-lock.json') }}
+
       - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: npx playwright install --with-deps chromium
+
+      - name: Cache Next.js
+        uses: actions/cache@v4
+        with:
+          path: |
+            app/bot/web/.next/cache
+            app/admin_bot/web/.next/cache
+          key: ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/*.js', '**/*.jsx', '**/*.ts', '**/*.tsx') }}
+          restore-keys: |
+            ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json') }}-
 
       - name: Build Next.js
         run: npm run build
